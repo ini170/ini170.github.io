@@ -1,0 +1,4 @@
+Third-party component: lamejs 1.2.1
+Upstream: https://github.com/zhuker/lamejs
+The upstream minified encoder is distributed unmodified in lame.min.js under LGPL-3.0.
+See LAMEJS-PACKAGE-LICENSE.txt and LGPL-3.0.txt. LAME website: https://lame.sourceforge.net

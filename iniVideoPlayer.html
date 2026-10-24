@@ -1172,6 +1172,24 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         </div>
       </div>
 
+      <!-- SRT 구문 반복 녹음: video 오디오를 자막 cue 단위 파일로 저장 -->
+      <div id="phraseRecordingPanel" style="margin:6px 0; padding:7px 8px; background:#141b1d; border:1px solid #29424a; border-radius:3px; font-size:11px;">
+        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:5px;">
+          <strong style="color:#8dd8e8; margin-right:3px;">구문 녹음</strong>
+          <select id="phraseRecordFormat" aria-label="녹음 포맷" onchange="setPhraseRecordingOption('format',this.value)" style="background:#222;color:#ddd;border:1px solid #444;padding:2px 4px;font-size:11px;">
+            <option value="mp3" selected>MP3</option>
+            <option value="webm">WebM/Opus</option>
+          </select>
+          <label style="color:#888;">비트레이트
+            <select id="phraseRecordBitrate" aria-label="녹음 비트레이트" onchange="setPhraseRecordingOption('bitrate',this.value)" style="background:#222;color:#ddd;border:1px solid #444;padding:2px 4px;font-size:11px;">
+              <option value="64">64 kbps</option><option value="96">96 kbps</option><option value="128" selected>128 kbps</option><option value="192">192 kbps</option><option value="256">256 kbps</option>
+            </select>
+          </label>
+          <button id="phraseRecordStart" onclick="startPhraseRecording(event)" style="background:#3b2020;color:#ffb4a8;border:1px solid #74413b;border-radius:3px;padding:3px 8px;cursor:pointer;">● 녹음 시작</button>
+          <button id="phraseRecordStop" onclick="stopPhraseRecording('user-stop')" disabled style="background:#292929;color:#aaa;border:1px solid #444;border-radius:3px;padding:3px 8px;cursor:pointer;">■ 저장 후 종료</button>
+        </div>
+        <div id="phraseRecordStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.45;">자막 반복 중인 영상 오디오를 문장별로 저장합니다. (별도 TTS 음성은 제외)</div>
+      </div>
       <!-- 여분 설정 -->
       <div style="margin-bottom:6px; display:flex; align-items:center; gap:8px; font-size:11px; color:#888;">
         <span>스타트여분</span>
@@ -1685,6 +1703,11 @@ let subtitles = [];
 let subIndex = -1;
 let manualCueSelectionIndex = -1;
 let pendingManualCueSelectionIndex = -1;
+let phraseRecordFormat = 'mp3';
+let phraseRecordBitrate = 128;
+let phraseRecorderSession = null;
+let phraseRecorderStarting = false;
+let phraseRecorderLamePromise = null;
 let loopCueSelectionIndex = -1; // 횟수 반복 중 seek 완료 이벤트가 이전 겹침 cue로 되돌리지 못하도록 고정
 let pendingLoopCueSeek = null; // { index, targetTime, awaitingSeeking, awaitingSeeked } — 프로그램 seek 이벤트 식별
 let loopUserSeekPending = false;
@@ -3673,6 +3696,7 @@ async function _requestPermissionAndLoad(i) {
 }
 
 function loadVideo(i, preserveLoopMode = false){
+  if (phraseRecorderSession) void stopPhraseRecording('video-change');
   currentIndex=i;
   _videoSubtitleReady = false;
   renderPlaylist();
@@ -4103,6 +4127,7 @@ function renderSubs(){
         if(loopMode === 'sub' && subIndex === i) {
           // 이미 반복 중이면 해제
           loopMode = 'none';
+          void stopPhraseRecording('loop-mode-disabled');
           console.log('❌ 자막 반복 해제:', s.text.substring(0, 30));
         } else {
           // 해당 자막 반복 설정
@@ -4396,6 +4421,7 @@ function loopSub(){
     if (inTtsPhase) cancelTtsPhase();
     seqMultiplier = 1.0; applyVideoRate();
     updateLoopStatus();
+    void stopPhraseRecording('loop-mode-disabled');
     return;
   }
 
@@ -4413,6 +4439,7 @@ function loopSub(){
   ttsSubPlayCount = 0;
   loopMode='sub';
   setLoopCueSelection(targetIndex);
+  _phraseRecorderObserve();
   seqMultiplier = 1.0; applyVideoRate();
   // 일시정지 상태에서 호출되면 단순 옵션 설정 — seek/재생/TTS 없이 모드만 설정 (재생 재개 시 자연스럽게 작동)
   if (video.paused) {
@@ -4442,6 +4469,7 @@ function loopAll(){
     if (inTtsPhase) cancelTtsPhase();
     seqMultiplier = 1.0; applyVideoRate();
     updateLoopStatus();
+    void stopPhraseRecording('loop-mode-disabled');
     return;
   }
 
@@ -4458,6 +4486,7 @@ function loopAll(){
   initialSubIndex = targetIndex; // 반복 시작 지점 저장
   loopMode='all';
   setLoopCueSelection(targetIndex);
+  _phraseRecorderObserve();
   loopAllBoundaryHandledIndex = -1;
   playCount=0;
   subPlayCount=0;
@@ -4487,6 +4516,7 @@ function toggleLoopRange() {
   // 구간반복 ON 시 특정자막(loopSub) 해제
   if (rangeLoopEnabled && loopMode === 'sub') {
     loopMode = 'none';
+    void stopPhraseRecording('loop-mode-disabled');
     loopCueSelectionIndex = -1;
     pendingLoopCueSeek = null;
     loopUserSeekPending = false;
@@ -5261,6 +5291,7 @@ function setCharDictPanelScale(value, persist = true) {
 // 반복 중지
 function stopLoop(){
   loopMode = 'none';
+  void stopPhraseRecording('loop-mode-disabled');
   loopCueSelectionIndex = -1;
   pendingLoopCueSeek = null;
   loopUserSeekPending = false;
@@ -5371,6 +5402,626 @@ video.addEventListener('seeked', () => {
   if (skipGaps) triggerSkipGap(false);
 });
 
+function setPhraseRecordingOption(kind, value) {
+  if (phraseRecorderStarting || phraseRecorderSession) return;
+  if (kind === 'format' && (value === 'mp3' || value === 'webm')) {
+    phraseRecordFormat = value;
+  } else if (kind === 'bitrate' && [64, 96, 128, 192, 256].includes(Number(value))) {
+    phraseRecordBitrate = Number(value);
+  } else {
+    return;
+  }
+  const formatSelect = document.getElementById('phraseRecordFormat');
+  const bitrateSelect = document.getElementById('phraseRecordBitrate');
+  if (formatSelect) formatSelect.value = phraseRecordFormat;
+  if (bitrateSelect) bitrateSelect.value = String(phraseRecordBitrate);
+  saveSettings();
+  _phraseRecorderUpdateUI();
+}
+function _phraseRecorderSetStatus(message, isError = false) {
+  const status = document.getElementById('phraseRecordStatus');
+  if (!status) return;
+  status.textContent = String(message || '');
+  status.style.color = isError ? '#ff9d8f' : '#83c9d6';
+}
+function _phraseRecorderUpdateUI(message) {
+  const busy = phraseRecorderStarting || !!phraseRecorderSession;
+  const start = document.getElementById('phraseRecordStart');
+  const stop = document.getElementById('phraseRecordStop');
+  const format = document.getElementById('phraseRecordFormat');
+  const bitrate = document.getElementById('phraseRecordBitrate');
+  if (start) start.disabled = busy;
+  if (stop) stop.disabled = !phraseRecorderSession;
+  if (format) { format.disabled = busy; format.value = phraseRecordFormat; }
+  if (bitrate) { bitrate.disabled = busy; bitrate.value = String(phraseRecordBitrate); }
+  if (message) _phraseRecorderSetStatus(message, false);
+}
+function _phraseRecorderSafeName(value, maxLength = 48) {
+  const safe = String(value || '')
+    .normalize('NFKC')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '')
+    .slice(0, maxLength)
+    .replace(/[. ]+$/g, '');
+  return safe || 'sentence';
+}
+function _phraseRecorderTimeStamp() {
+  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+function _phraseRecorderCueIndex() {
+  if (loopMode !== 'sub' && loopMode !== 'all') return -1;
+  const index = Number.isInteger(loopCueSelectionIndex) &&
+      loopCueSelectionIndex >= 0 && loopCueSelectionIndex < subtitles.length
+    ? loopCueSelectionIndex : subIndex;
+  return Number.isInteger(index) && index >= 0 && index < subtitles.length ? index : -1;
+}
+function _phraseRecorderCueMeta(index) {
+  const cue = subtitles[index];
+  const item = playlist && playlist[currentIndex] || {};
+  const videoFile = item.video || null;
+  const srtFile = item.srt || null;
+  const videoPath = String(item.videoRelativePath || item.videoPath ||
+    (videoFile && videoFile.webkitRelativePath) || item.relativePath ||
+    (videoFile && videoFile.name) || '');
+  const srtPath = String(item.srtRelativePath || item.srtPath ||
+    (srtFile && srtFile.webkitRelativePath) || (srtFile && srtFile.name) || '');
+  const start = Math.max(0, Number(cue && cue.start) || 0);
+  const end = Math.max(start, Number(cue && cue.end) || start);
+  const videoName = String(videoFile && videoFile.name || 'video');
+  const srtName = String(srtFile && srtFile.name || item.srtName || '');
+  const text = String(cue && cue.text || '');
+  return {
+    cueId: videoPath + '|' + srtPath + '|' + (index + 1) + '|' +
+      Math.round(start * 1000) + '-' + Math.round(end * 1000),
+    cueIndex: index,
+    cueNumber: index + 1,
+    videoName,
+    videoPath,
+    srtName,
+    srtPath,
+    text,
+    startSeconds: start,
+    endSeconds: end,
+    startMs: Math.round(start * 1000),
+    endMs: Math.round(end * 1000)
+  };
+}
+function _phraseRecorderEnsureLame() {
+  if (window.lamejs && typeof window.lamejs.Mp3Encoder === 'function') return Promise.resolve(true);
+  if (phraseRecorderLamePromise) return phraseRecorderLamePromise;
+  phraseRecorderLamePromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('vendor/lame.min.js', document.baseURI).href;
+    script.async = true;
+    script.onload = () => {
+      if (window.lamejs && typeof window.lamejs.Mp3Encoder === 'function') resolve(true);
+      else reject(new Error('로컬 MP3 인코더를 불러오지 못했습니다.'));
+    };
+    script.onerror = () => reject(new Error('vendor/lame.min.js를 읽지 못했습니다. 실행 폴더의 vendor 파일을 함께 복사해 주세요.'));
+    document.head.appendChild(script);
+  }).catch(error => {
+    phraseRecorderLamePromise = null;
+    throw error;
+  });
+  return phraseRecorderLamePromise;
+}
+function _phraseRecorderChooseDestination() {
+  if (window.parent !== window) {
+    let begin;
+    try { begin = window.parent.vpPhraseRecordingBeginFromPlayer; }
+    catch (_) { begin = null; }
+    if (typeof begin !== 'function') {
+      return Promise.reject(new Error('메인 앱의 녹음 폴더 저장 연결을 사용할 수 없습니다.'));
+    }
+    let pending;
+    try { pending = begin.call(window.parent, window); }
+    catch (error) { return Promise.reject(error); }
+    return Promise.resolve(pending).then(result => {
+      if (!result || result.ok !== true || !result.id) {
+        throw new Error(result && result.message || '녹음 폴더를 선택하지 못했습니다.');
+      }
+      return { kind: 'host', id: result.id, name: String(result.name || '') };
+    });
+  }
+  if (typeof window.showDirectoryPicker !== 'function') {
+    return Promise.reject(new Error('이 브라우저는 폴더 저장을 지원하지 않습니다. Chrome 또는 Edge에서 열어 주세요.'));
+  }
+  let pending;
+  try { pending = window.showDirectoryPicker({ mode: 'readwrite' }); }
+  catch (error) { return Promise.reject(error); }
+  return Promise.resolve(pending).then(directory => ({ kind: 'local', directory, name:directory.name || '' }));
+}
+function _phraseRecorderWriteFile(session, name, blob, append = false) {
+  if (session.destination.kind === 'host') {
+    let write;
+    try { write = window.parent.vpPhraseRecordingWriteFileFromPlayer; }
+    catch (_) { write = null; }
+    if (typeof write !== 'function') return Promise.reject(new Error('메인 앱의 녹음 파일 저장 연결이 끊겼습니다.'));
+    return Promise.resolve(write.call(window.parent, window, session.destination.id, name, blob, append));
+  }
+  return (async () => {
+    const handle = await session.destination.directory.getFileHandle(name, { create:true });
+    const writer = append
+      ? await handle.createWritable({ keepExistingData:true })
+      : await handle.createWritable();
+    try {
+      if (append) {
+        const oldFile = await handle.getFile();
+        await writer.seek(oldFile.size);
+      }
+      await writer.write(blob);
+      await writer.close();
+      return { ok:true, name, size:blob.size };
+    } catch (error) {
+      try { await writer.abort(); } catch (_) {}
+      throw error;
+    }
+  })();
+}
+function _phraseRecorderPersistManifest(session) {
+  const blob = new Blob([JSON.stringify(session.manifest, null, 2)], {
+    type:'application/json;charset=utf-8'
+  });
+  return _phraseRecorderWriteFile(session, session.manifestFileName, blob, false);
+}
+function _phraseRecorderGetWebMMime() {
+  if (typeof MediaRecorder !== 'function' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    throw new Error('이 브라우저는 WebM 녹음을 지원하지 않습니다.');
+  }
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm'];
+  const mime = candidates.find(type => MediaRecorder.isTypeSupported(type));
+  if (!mime) throw new Error('이 브라우저에서 사용할 수 있는 WebM/Opus 녹음 포맷이 없습니다.');
+  return mime;
+}
+function _phraseRecorderToInt16(floatSamples) {
+  const pcm = new Int16Array(floatSamples.length);
+  for (let i = 0; i < floatSamples.length; i++) {
+    const value = Math.max(-1, Math.min(1, floatSamples[i] || 0));
+    pcm[i] = value < 0 ? Math.round(value * 32768) : Math.round(value * 32767);
+  }
+  return pcm;
+}
+function _phraseRecorderBuildFileName(session, meta, part) {
+  const extension = session.format === 'mp3' ? 'mp3' : 'webm';
+  const range = String(meta.startMs).padStart(8, '0') + '-' + String(meta.endMs).padStart(8, '0');
+  const partSuffix = session.format === 'webm' && part > 1
+    ? '_part' + String(part).padStart(2, '0') : '';
+  return session.filePrefix + '_S' + String(meta.cueNumber).padStart(4, '0') +
+    '_' + range + '_' + _phraseRecorderSafeName(meta.text, 34) + partSuffix + '.' + extension;
+}
+function _phraseRecorderQueueSegment(session, segment, blob, reason) {
+  if (!blob || blob.size <= 0) {
+    _phraseRecorderSetStatus('자막 ' + segment.meta.cueNumber + '번 녹음 데이터가 비어 있어 저장하지 않았습니다.', true);
+    return Promise.resolve(false);
+  }
+  let entry;
+  let append = false;
+  let part = 1;
+  if (session.format === 'mp3') {
+    entry = session.mp3EntryByCue.get(segment.meta.cueId);
+    if (entry) {
+      append = true;
+      entry.recordingSegments++;
+      entry.completedPasses += segment.completedPasses;
+      entry.partial = entry.completedPasses <= 0;
+      entry.lastRecordedAt = new Date().toISOString();
+      entry.finishReason = String(reason || '');
+    } else {
+      entry = {
+        cueId:segment.meta.cueId,
+        cueNumber:segment.meta.cueNumber,
+        subtitleText:segment.meta.text,
+        videoName:segment.meta.videoName,
+        videoRelativePath:segment.meta.videoPath,
+        srtName:segment.meta.srtName,
+        srtRelativePath:segment.meta.srtPath,
+        startMs:segment.meta.startMs,
+        endMs:segment.meta.endMs,
+        fileName:'',
+        format:'mp3',
+        bitrateKbps:session.bitrate,
+        completedPasses:segment.completedPasses,
+        recordingSegments:1,
+        partial:segment.completedPasses <= 0,
+        firstRecordedAt:segment.startedAt,
+        lastRecordedAt:new Date().toISOString(),
+        captureStartVideoSeconds:segment.captureStartVideoSeconds,
+        finishReason:String(reason || ''),
+        status:'pending',
+        bytes:0
+      };
+      session.mp3EntryByCue.set(segment.meta.cueId, entry);
+      session.manifest.entries.push(entry);
+    }
+  } else {
+    part = (session.webmPartByCue.get(segment.meta.cueId) || 0) + 1;
+    session.webmPartByCue.set(segment.meta.cueId, part);
+    entry = {
+      cueId:segment.meta.cueId,
+      cueNumber:segment.meta.cueNumber,
+      subtitleText:segment.meta.text,
+      videoName:segment.meta.videoName,
+      videoRelativePath:segment.meta.videoPath,
+      srtName:segment.meta.srtName,
+      srtRelativePath:segment.meta.srtPath,
+      startMs:segment.meta.startMs,
+      endMs:segment.meta.endMs,
+      fileName:'',
+      format:'webm',
+      mimeType:session.mimeType,
+      bitrateKbps:session.bitrate,
+      completedPasses:segment.completedPasses,
+      recordingSegments:1,
+      partial:segment.completedPasses <= 0,
+      firstRecordedAt:segment.startedAt,
+      lastRecordedAt:new Date().toISOString(),
+      captureStartVideoSeconds:segment.captureStartVideoSeconds,
+      finishReason:String(reason || ''),
+      status:'pending',
+      bytes:0
+    };
+    session.manifest.entries.push(entry);
+  }
+  if (!entry.fileName) entry.fileName = _phraseRecorderBuildFileName(session, segment.meta, part);
+  const fileName = entry.fileName;
+  const task = session.saveQueue.then(async () => {
+    try {
+      const result = await _phraseRecorderWriteFile(session, fileName, blob, append);
+      if (!result || result.ok !== true) throw new Error(result && result.message || '녹음 파일 저장에 실패했습니다.');
+      entry.status = 'saved';
+      entry.bytes = (Number(entry.bytes) || 0) + blob.size;
+    } catch (error) {
+      entry.status = 'error';
+      entry.error = String(error && error.message || error || '파일 저장 오류');
+      session.manifest.errors.push({ fileName, message:entry.error, at:new Date().toISOString() });
+      _phraseRecorderSetStatus(fileName + ' 저장 실패: ' + entry.error, true);
+    }
+    try {
+      const manifestResult = await _phraseRecorderPersistManifest(session);
+      if (!manifestResult || manifestResult.ok !== true) throw new Error(manifestResult && manifestResult.message || 'manifest 저장 실패');
+    } catch (error) {
+      entry.manifestError = String(error && error.message || error);
+      _phraseRecorderSetStatus('녹음 파일은 처리했지만 manifest 갱신에 실패했습니다: ' + entry.manifestError, true);
+    }
+    return entry.status === 'saved';
+  });
+  session.saveQueue = task.catch(error => {
+    _phraseRecorderSetStatus('녹음 파일 저장 대기열 오류: ' + String(error && error.message || error), true);
+    return false;
+  });
+  return session.saveQueue;
+}
+function _phraseRecorderStartSegment(session, cueIndex) {
+  if (!session || session.stopping || !Number.isInteger(cueIndex) || cueIndex < 0 || cueIndex >= subtitles.length) return false;
+  const meta = _phraseRecorderCueMeta(cueIndex);
+  const segment = {
+    meta,
+    startedAt:new Date().toISOString(),
+    captureStartVideoSeconds:Number(video.currentTime) || 0,
+    completedPasses:0,
+    chunks:[],
+    recorder:null,
+    encoder:null,
+    finishPromise:null,
+    finalized:false,
+    stopResolve:null,
+    limitTimer:null,
+    sampleCount:0
+  };
+  if (session.format === 'mp3') {
+    segment.encoder = new window.lamejs.Mp3Encoder(2, session.audioContext.sampleRate, session.bitrate);
+  } else {
+    const recorder = new MediaRecorder(session.audioOnlyStream, {
+      mimeType:session.mimeType,
+      audioBitsPerSecond:session.bitrate * 1000
+    });
+    segment.recorder = recorder;
+    recorder.ondataavailable = event => {
+      if (event.data && event.data.size > 0) segment.chunks.push(event.data);
+    };
+    recorder.onerror = event => {
+      _phraseRecorderSetStatus('WebM 녹음 오류: ' + String(event && event.error && event.error.message || '녹음 중단'), true);
+      void stopPhraseRecording('capture-error');
+    };
+    recorder.onstop = () => {
+      if (segment.finalized) return;
+      segment.finalized = true;
+      const blob = new Blob(segment.chunks, { type:session.mimeType });
+      segment.savePromise = _phraseRecorderQueueSegment(session, segment, blob, segment.finishReason || 'stream-ended');
+      if (segment.stopResolve) Promise.resolve(segment.savePromise).then(segment.stopResolve);
+    };
+    recorder.start(1000);
+    if (video.paused && recorder.state === 'recording') recorder.pause();
+  }
+  session.current = segment;
+  segment.limitTimer = setTimeout(() => {
+    if (phraseRecorderSession === session && session.current === segment) {
+      _phraseRecorderSetStatus('한 문장 녹음 10분 상한에 도달해 자원을 보호하며 저장을 마칩니다.');
+      void stopPhraseRecording('sentence-safety-limit');
+    }
+  }, 10 * 60 * 1000);
+  _phraseRecorderSetStatus('자막 ' + (cueIndex + 1) + '번 문장 녹음 중 · 반복 횟수를 마치거나 정지하면 파일을 저장합니다.');
+  return true;
+}
+function _phraseRecorderFinishSegment(session, reason) {
+  const segment = session && session.current;
+  if (!segment) return Promise.resolve(true);
+  session.current = null;
+  clearTimeout(segment.limitTimer);
+  segment.finishReason = String(reason || 'stopped');
+  if (segment.finishPromise) return segment.finishPromise;
+  if (session.format === 'mp3') {
+    try {
+      const tail = segment.encoder && segment.encoder.flush();
+      if (tail && tail.length) segment.chunks.push(tail);
+      const blob = new Blob(segment.chunks, { type:'audio/mpeg' });
+      segment.finishPromise = _phraseRecorderQueueSegment(session, segment, blob, segment.finishReason);
+    } catch (error) {
+      _phraseRecorderSetStatus('MP3 마무리 인코딩 실패: ' + String(error && error.message || error), true);
+      segment.finishPromise = Promise.resolve(false);
+    }
+    return segment.finishPromise;
+  }
+  const recorder = segment.recorder;
+  segment.finishPromise = new Promise(resolve => {
+    segment.stopResolve = resolve;
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); }
+      catch (error) {
+        segment.stopResolve = null;
+        segment.finalized = true;
+        const blob = new Blob(segment.chunks, { type:session.mimeType });
+        Promise.resolve(_phraseRecorderQueueSegment(session, segment, blob, segment.finishReason)).then(resolve);
+      }
+    } else if (segment.finalized && segment.savePromise) {
+      Promise.resolve(segment.savePromise).then(resolve);
+    } else {
+      segment.finalized = true;
+      const blob = new Blob(segment.chunks, { type:session.mimeType });
+      segment.savePromise = _phraseRecorderQueueSegment(session, segment, blob, segment.finishReason);
+      Promise.resolve(segment.savePromise).then(resolve);
+    }
+  });
+  return segment.finishPromise;
+}
+function _phraseRecorderObserve() {
+  const session = phraseRecorderSession;
+  if (!session || session.stopping) return;
+  if (loopMode !== 'sub' && loopMode !== 'all') {
+    void stopPhraseRecording('loop-mode-disabled');
+    return;
+  }
+  const cueIndex = _phraseRecorderCueIndex();
+  if (cueIndex < 0) return;
+  const cue = subtitles[cueIndex];
+  const marginStart = Math.max(0, Number(startMargin) || 0);
+  const marginEnd = Math.max(0, Number(endMargin) || 0);
+  const inCaptureWindow = video.currentTime >= Math.max(0, cue.start - marginStart - 0.05) &&
+    video.currentTime < cue.end + marginEnd + 0.1;
+  if (session.current && session.current.meta.cueIndex !== cueIndex) {
+    void _phraseRecorderFinishSegment(session, 'next-subtitle');
+  }
+  if (!inCaptureWindow) return;
+  if (!session.current) {
+    try { _phraseRecorderStartSegment(session, cueIndex); }
+    catch (error) {
+      _phraseRecorderSetStatus('문장 녹음을 시작하지 못했습니다: ' + String(error && error.message || error), true);
+      void stopPhraseRecording('segment-start-error');
+    }
+  }
+}
+function _phraseRecorderMarkPass(cueIndex) {
+  const segment = phraseRecorderSession && phraseRecorderSession.current;
+  if (segment && segment.meta.cueIndex === cueIndex) segment.completedPasses++;
+}
+async function _phraseRecorderCleanup(session) {
+  try { if (session.processor) { session.processor.onaudioprocess = null; session.processor.disconnect(); } } catch (_) {}
+  try { if (session.source) session.source.disconnect(); } catch (_) {}
+  try { if (session.silentGain) session.silentGain.disconnect(); } catch (_) {}
+  try { if (session.captureStream) session.captureStream.getTracks().forEach(track => track.stop()); } catch (_) {}
+  try {
+    if (session.audioContext && session.audioContext.state !== 'closed') await session.audioContext.close();
+  } catch (_) {}
+  if (session.destination && session.destination.kind === 'host') {
+    try {
+      const finish = window.parent.vpPhraseRecordingFinishFromPlayer;
+      if (typeof finish === 'function') await finish.call(window.parent, window, session.destination.id);
+    } catch (error) { console.warn('[Phrase recorder] 부모 저장 세션 종료 실패', error); }
+  }
+}
+async function startPhraseRecording(event) {
+  if (!event || event.isTrusted !== true) {
+    _phraseRecorderSetStatus('녹음 폴더 선택은 녹음 시작 버튼을 직접 눌러 실행해 주세요.', true);
+    return false;
+  }
+  if (phraseRecorderStarting || phraseRecorderSession) return false;
+  if (loopMode !== 'sub' && loopMode !== 'all') {
+    _phraseRecorderSetStatus('특정자막 또는 횟수구간 반복을 먼저 켜 주세요.', true);
+    return false;
+  }
+  if (!video.currentSrc || video.readyState < 1) {
+    _phraseRecorderSetStatus('먼저 영상 또는 MP3와 SRT를 재생목록에서 열어 주세요.', true);
+    return false;
+  }
+  phraseRecorderStarting = true;
+  _phraseRecorderUpdateUI('저장 폴더를 선택해 주세요.');
+  let earlyAudioContext = null;
+  let earlyResume = Promise.resolve();
+  let destination = null;
+  let session = null;
+  try {
+    if (phraseRecordFormat === 'mp3') {
+      const AudioContextType = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextType) throw new Error('이 브라우저는 MP3 실시간 오디오 처리를 지원하지 않습니다. WebM/Opus를 선택해 주세요.');
+      earlyAudioContext = new AudioContextType({ sampleRate:44100 });
+      earlyResume = earlyAudioContext.resume();
+      earlyResume.catch(() => {});
+    }
+    const destinationPromise = _phraseRecorderChooseDestination();
+    destination = await destinationPromise;
+    if (phraseRecordFormat === 'mp3') await _phraseRecorderEnsureLame();
+    if (loopMode !== 'sub' && loopMode !== 'all') throw new Error('폴더 선택 중 반복 모드가 종료되었습니다.');
+    const captureMethod = video.captureStream || video.mozCaptureStream;
+    if (typeof captureMethod !== 'function') throw new Error('이 브라우저는 영상 오디오 캡처를 지원하지 않습니다. WebM/Opus도 사용할 수 없습니다.');
+    const captureStream = captureMethod.call(video);
+    const audioTracks = captureStream.getAudioTracks().filter(track => track.readyState === 'live');
+    if (!audioTracks.length) {
+      captureStream.getTracks().forEach(track => track.stop());
+      throw new Error('현재 파일에서 오디오 트랙을 찾지 못했습니다.');
+    }
+    const item = playlist && playlist[currentIndex] || {};
+    const videoFile = item.video || {};
+    const videoName = String(videoFile.name || 'video');
+    const filePrefix = 'VP_' + _phraseRecorderTimeStamp() + '_' +
+      _phraseRecorderSafeName(videoName.replace(/\.[^.]+$/, ''), 24);
+    const sessionId = 'phrase-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    session = {
+      id:sessionId,
+      destination,
+      format:phraseRecordFormat,
+      bitrate:phraseRecordBitrate,
+      filePrefix,
+      manifestFileName:filePrefix + '_recording-manifest.json',
+      captureStream,
+      audioOnlyStream:new MediaStream(audioTracks),
+      audioContext:earlyAudioContext,
+      source:null,
+      processor:null,
+      silentGain:null,
+      mimeType:phraseRecordFormat === 'webm' ? _phraseRecorderGetWebMMime() : 'audio/mpeg',
+      current:null,
+      stopping:false,
+      stopPromise:null,
+      saveQueue:Promise.resolve(true),
+      mp3EntryByCue:new Map(),
+      webmPartByCue:new Map(),
+      manifest:{
+        schemaVersion:1,
+        manifestType:'iniVideoPlayer-phrase-recordings',
+        session:{
+          id:sessionId,
+          createdAt:new Date().toISOString(),
+          status:'recording',
+          format:phraseRecordFormat,
+          bitrateKbps:phraseRecordBitrate,
+          videoName,
+          videoRelativePath:String(item.videoRelativePath || item.videoPath ||
+            videoFile.webkitRelativePath || item.relativePath || videoName),
+          srtName:String(item.srt && item.srt.name || item.srtName || ''),
+          srtRelativePath:String(item.srtRelativePath || item.srtPath ||
+            (item.srt && item.srt.webkitRelativePath) || (item.srt && item.srt.name) || ''),
+          audioSource:'HTMLMediaElement.captureStream audio track; external TTS is not included',
+          linkedDatabase:false
+        },
+        entries:[],
+        errors:[]
+      }
+    };
+    phraseRecorderSession = session;
+    const initialManifest = await _phraseRecorderPersistManifest(session);
+    if (!initialManifest || initialManifest.ok !== true) {
+      throw new Error(initialManifest && initialManifest.message || '녹음 manifest를 폴더에 만들지 못했습니다.');
+    }
+    if (phraseRecordFormat === 'mp3') {
+      await earlyResume;
+      session.source = session.audioContext.createMediaStreamSource(session.audioOnlyStream);
+      session.processor = session.audioContext.createScriptProcessor(4096, 2, 2);
+      session.silentGain = session.audioContext.createGain();
+      session.silentGain.gain.value = 0;
+      session.processor.onaudioprocess = audioEvent => {
+        const output = audioEvent.outputBuffer;
+        for (let channel = 0; channel < output.numberOfChannels; channel++) output.getChannelData(channel).fill(0);
+        const activeSession = phraseRecorderSession;
+        const segment = activeSession && activeSession.current;
+        if (activeSession !== session || session.stopping || !segment || video.paused || video.seeking) return;
+        const input = audioEvent.inputBuffer;
+        if (!input || input.length <= 0) return;
+        const left = _phraseRecorderToInt16(input.getChannelData(0));
+        const right = input.numberOfChannels > 1
+          ? _phraseRecorderToInt16(input.getChannelData(1)) : left;
+        const encoded = segment.encoder.encodeBuffer(left, right);
+        if (encoded && encoded.length) segment.chunks.push(encoded);
+        segment.sampleCount += input.length;
+      };
+      session.source.connect(session.processor);
+      session.processor.connect(session.silentGain);
+      session.silentGain.connect(session.audioContext.destination);
+    }
+    phraseRecorderStarting = false;
+    _phraseRecorderUpdateUI('녹음 준비 완료 · 반복 구간 안에서 자막별 파일을 만듭니다.');
+    _phraseRecorderObserve();
+    return true;
+  } catch (error) {
+    phraseRecorderStarting = false;
+    if (session && phraseRecorderSession === session) {
+      try { await stopPhraseRecording('start-error'); } catch (_) {}
+    } else {
+      if (destination && destination.kind === 'host') {
+        try {
+          const finish = window.parent.vpPhraseRecordingFinishFromPlayer;
+          if (typeof finish === 'function') await finish.call(window.parent, window, destination.id);
+        } catch (_) {}
+      }
+      try { if (earlyAudioContext && earlyAudioContext.state !== 'closed') await earlyAudioContext.close(); } catch (_) {}
+    }
+    const message = error && error.name === 'AbortError'
+      ? '녹음 폴더 선택을 취소했습니다.'
+      : String(error && error.message || error || '녹음을 시작하지 못했습니다.');
+    _phraseRecorderUpdateUI(message);
+    if (!error || error.name !== 'AbortError') showTimeDisplay(message, 5000);
+    return false;
+  }
+}
+function stopPhraseRecording(reason = 'user-stop') {
+  const session = phraseRecorderSession;
+  if (!session) {
+    phraseRecorderStarting = false;
+    _phraseRecorderUpdateUI(reason === 'user-stop' ? '녹음 중이 아닙니다.' : undefined);
+    return Promise.resolve(false);
+  }
+  if (session.stopPromise) return session.stopPromise;
+  session.stopping = true;
+  session.manifest.session.status = 'saving';
+  session.manifest.session.stopReason = String(reason || 'stopped');
+  const segmentPromise = _phraseRecorderFinishSegment(session, reason);
+  session.stopPromise = (async () => {
+    await segmentPromise;
+    await session.saveQueue;
+    session.manifest.session.status = 'finished';
+    session.manifest.session.finishedAt = new Date().toISOString();
+    session.manifest.session.savedSentenceCount = session.manifest.entries.filter(entry => entry.status === 'saved').length;
+    try {
+      const result = await _phraseRecorderPersistManifest(session);
+      if (!result || result.ok !== true) throw new Error(result && result.message || 'manifest 저장 실패');
+    } catch (error) {
+      session.manifest.errors.push({ fileName:session.manifestFileName, message:String(error && error.message || error), at:new Date().toISOString() });
+    }
+    await _phraseRecorderCleanup(session);
+    if (phraseRecorderSession === session) phraseRecorderSession = null;
+    const savedCount = session.manifest.session.savedSentenceCount || 0;
+    _phraseRecorderUpdateUI('녹음 종료 · ' + savedCount + '개 문장 파일 저장 · manifest에 영상/SRT 경로와 구간 기록');
+    showTimeDisplay('구문 녹음 저장 완료: ' + savedCount + '개 문장', 3500);
+    return true;
+  })();
+  _phraseRecorderUpdateUI('현재 문장 파일을 마무리해 폴더에 저장 중입니다.');
+  return session.stopPromise;
+}
+video.addEventListener('pause', () => {
+  const recorder = phraseRecorderSession && phraseRecorderSession.current && phraseRecorderSession.current.recorder;
+  if (recorder && recorder.state === 'recording') {
+    try { recorder.pause(); } catch (_) {}
+  }
+});
+video.addEventListener('play', () => {
+  const recorder = phraseRecorderSession && phraseRecorderSession.current && phraseRecorderSession.current.recorder;
+  if (recorder && recorder.state === 'paused') {
+    try { recorder.resume(); } catch (_) {}
+  }
+});
+video.addEventListener('seeked', () => _phraseRecorderObserve());
+video.addEventListener('ended', () => { void stopPhraseRecording('video-ended'); });
 video.ontimeupdate=()=>{
   // 반복 cue lock을 현재 인덱스의 기준으로 삼아 오래된 seek/event가 이전 cue 경계를 다시 실행하지 않게 한다.
   if ((loopMode === 'sub' || loopMode === 'all') &&
@@ -5429,6 +6080,7 @@ video.ontimeupdate=()=>{
     updateLoopStatus();
   }
 
+  _phraseRecorderObserve();
   // 3) 오버레이/UI 표시할 자막 결정
   //    - 루프 잠김 + subIndex 의 자막 구간 안: 잠긴 자막 표시 (오버랩 자막이 가리지 않음)
   //    - 그 외: playbackTargetIndex 표시 — 겹치는 다음 cue가 현재 cue를 끝나기 전에 덮지 않음
@@ -5545,6 +6197,7 @@ video.ontimeupdate=()=>{
     const currentSub = subtitles[subIndex];
     if(video.currentTime >= currentSub.end + endMargin){
       subPlayCount++;
+      _phraseRecorderMarkPass(subIndex);
       ttsSubPlayCount++;
 
       // ── TTS 삽입 판단 ──────────────────────────────────────────
@@ -5590,6 +6243,7 @@ video.ontimeupdate=()=>{
   if(loopMode === 'all' && subIndex >= 0 && !dfNavigating && !inTtsPhase && !loopRewinding){
     const currentSub = subtitles[subIndex];
     if(video.currentTime >= currentSub.end + endMargin && loopAllBoundaryHandledIndex !== subIndex){
+      _phraseRecorderMarkPass(subIndex);
       // 같은 cue의 종료 timeupdate가 여러 번 와도 pass 횟수는 한 번만 처리한다.
       loopAllBoundaryHandledIndex = subIndex;
       if(subPlayCount < repeatTimes - 1){
@@ -5654,6 +6308,7 @@ video.ontimeupdate=()=>{
               } else {
                 // 더 진행할 영상 없음 → 루프 종료 + 정지 (onended 의 wrap-around 로 인한 무한루프 방지)
                 loopMode = 'none';
+                void stopPhraseRecording('loop-finished');
                 video.pause();
                 updateLoopStatus();
               }
@@ -6320,6 +6975,16 @@ function _applySettingsSnapshot(s) {
   if (Number.isFinite(s.setTimes) && s.setTimes > 0) setTimes = s.setTimes;
   if (Number.isFinite(s.startMargin) && s.startMargin >= 0) startMargin = s.startMargin;
   if (Number.isFinite(s.endMargin) && s.endMargin >= 0) endMargin = s.endMargin;
+  if (s.phraseRecordFormat === 'mp3' || s.phraseRecordFormat === 'webm') {
+    phraseRecordFormat = s.phraseRecordFormat;
+    const formatEl = document.getElementById('phraseRecordFormat');
+    if (formatEl) formatEl.value = phraseRecordFormat;
+  }
+  if ([64, 96, 128, 192, 256].includes(Number(s.phraseRecordBitrate))) {
+    phraseRecordBitrate = Number(s.phraseRecordBitrate);
+    const bitrateEl = document.getElementById('phraseRecordBitrate');
+    if (bitrateEl) bitrateEl.value = String(phraseRecordBitrate);
+  }
   if (Number.isFinite(s.frameRate) && s.frameRate > 0) frameRate = s.frameRate;
   if (s.playlistLoopMode === 'none' || s.playlistLoopMode === 'one' || s.playlistLoopMode === 'all') playlistLoopMode = s.playlistLoopMode;
   if (s.loopMode === 'none' || s.loopMode === 'sub' || s.loopMode === 'all' || s.loopMode === 'playlist') loopMode = s.loopMode;
@@ -6439,6 +7104,7 @@ function saveSettings() {
       ttsLoopEnabled, ttsLoopMode, ttsLangZh, ttsLangKo, ttsPreLangZh, ttsPreLangKo,
       ttsPostOrder, ttsPreOrder,
       ttsPreZhCount, ttsPostZhCount, ttsKoUseSubtitle,
+      phraseRecordFormat, phraseRecordBitrate,
       mainVolume, muted: !!video.muted,
       skipGaps, sequentialSlowdownEnabled, targetRepeatCount,
       minPlaybackSpeed, baseSpeed, repeatTimes, setTimes,
@@ -7061,6 +7727,7 @@ async function applyEdit(event){
   if (saveResult.path) item.srtPath = saveResult.path;
   if (saveResult.accessId) item.accessId = saveResult.accessId;
   _setPlaylistFileAccessStatus(item, 'srt', 'ready');
+  if (phraseRecorderSession) void stopPhraseRecording('subtitle-changed');
   subtitles = parsed;
   renderSubs();
   loopMode = 'none';
