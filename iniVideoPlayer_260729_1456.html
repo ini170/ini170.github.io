@@ -2972,6 +2972,9 @@ window.addEventListener('message', e => {
       _updatePlaylistPermissionUI();
     }
     else if (c === 'vp-access-host-ready' && e.source === parent) {
+      // 부모의 IndexedDB 초기화가 끝난 뒤 보낸 확정 응답만 처리한다.
+      // 초기 iframe load의 임시 handleCount=0은 연결 해제로 오판하지 않는다.
+      if (e.data.ready !== true) return;
       playlistHostedMode = true;
       playlistRootConnectionKnown = true;
       playlistAccessHostKnown = true;
@@ -2995,6 +2998,9 @@ window.addEventListener('message', e => {
     else if (c === 'vp-access-result' && e.source === parent) {
       playlistAccessHostKnown = true;
       _finishHostedPlaylistPermissionRequest(e.data);
+    }
+    else if (c === 'vp-access-storage-error' && e.source === parent) {
+      showTimeDisplay(e.data.message || '⚠ 저장된 파일 연결을 확인하지 못했습니다. 연결 해제 상태로 확정하지 않고 복원을 보류합니다.', 9000);
     }
     else if (c === 'vp-import-progress' && e.source === parent) {
       _setPlaylistImportStatus(e.data.message || '');
