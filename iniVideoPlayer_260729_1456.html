@@ -6104,6 +6104,7 @@ function getSeqMultiplier(repeatIndex) {
 // ===== 설정 영속화 (localStorage + IndexedDB fallback) =====
 const SETTINGS_KEY = 'iniVP_settings';
 const SETTINGS_IDB_KEY = 'playerSettings';
+const TTS_MODE_SCHEMA_VERSION = 1;
 let _settingsSavedAt = 0;
 let _settingsDBReady = false;
 let _settingsRestoreComplete = false;
@@ -6113,6 +6114,17 @@ let _localSettingsSnapshot = null;
 let _pendingSettingsSnapshot = null;
 let _pendingVideoLoopSnapshot = null;
 let _videoSubtitleReady = false;
+
+// 이전 설정에서 일시정지 모드가 의도치 않게 저장되어 새로고침 후에도
+// 사전·사후 TTS가 영상을 멈추던 값을 한 번만 기존 기본 동작인 오버랩으로 이관한다.
+function _normalizeTtsModeSettingsSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  if ((Number(snapshot.ttsLoopModeSchemaVersion) || 0) >= TTS_MODE_SCHEMA_VERSION) return snapshot;
+  return Object.assign({}, snapshot, {
+    ttsLoopMode: 'overlap',
+    ttsLoopModeSchemaVersion: TTS_MODE_SCHEMA_VERSION
+  });
+}
 
 function _videoOptionKey(item) {
   if (!item) return '';
@@ -6235,6 +6247,7 @@ function _applyPendingVideoLoopSnapshot(item) {
 }
 function _acceptParentSettingsSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return false;
+  snapshot = _normalizeTtsModeSettingsSnapshot(snapshot);
   const savedAt = _settingsTimestamp(snapshot);
   if (!savedAt || savedAt <= _settingsSavedAt) return false;
   if (!_applySettingsSnapshot(snapshot)) return false;
@@ -6284,6 +6297,7 @@ function _completeSettingsBootstrap() {
 
 function _applySettingsSnapshot(s) {
   if (!s || typeof s !== 'object') return false;
+  s = _normalizeTtsModeSettingsSnapshot(s);
   if (typeof s.ttsLoopEnabled === 'boolean') ttsLoopEnabled = s.ttsLoopEnabled;
   if (s.ttsLoopMode === 'overlap' || s.ttsLoopMode === 'pause') ttsLoopMode = s.ttsLoopMode;
   if (typeof s.ttsLangZh === 'boolean') ttsLangZh = s.ttsLangZh;
@@ -6396,6 +6410,7 @@ async function _restoreSettingsFromIDB() {
       _savedAt: Math.max(Date.now(), _settingsSavedAt + 1)
     });
   }
+  selected = _normalizeTtsModeSettingsSnapshot(selected);
   if (!_applySettingsSnapshot(selected)) return;
 
   _settingsSavedAt = _settingsTimestamp(selected);
@@ -6420,6 +6435,7 @@ function saveSettings() {
   try {
     const getFlex = id => { const el = document.getElementById(id); return el ? el.style.flex : ''; };
     const obj = {
+      ttsLoopModeSchemaVersion: TTS_MODE_SCHEMA_VERSION,
       ttsLoopEnabled, ttsLoopMode, ttsLangZh, ttsLangKo, ttsPreLangZh, ttsPreLangKo,
       ttsPostOrder, ttsPreOrder,
       ttsPreZhCount, ttsPostZhCount, ttsKoUseSubtitle,
@@ -6484,10 +6500,14 @@ function loadSettings() {
       _localSettingsSnapshot = null;
       return false;
     }
-    const s = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    const s = _normalizeTtsModeSettingsSnapshot(parsed);
     if (!_applySettingsSnapshot(s)) return false;
     _settingsSavedAt = _settingsTimestamp(s);
     _localSettingsSnapshot = s;
+    if (s !== parsed) {
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (_) {}
+    }
     return true;
   } catch (error) {
     console.warn('[Settings] localStorage 불러오기 실패', error);
@@ -6554,6 +6574,7 @@ function toggleTtsLoop() {
 function toggleTtsMode() {
   ttsLoopMode = (ttsLoopMode === 'overlap') ? 'pause' : 'overlap';
   updateTtsUI();
+  try { saveSettings(); } catch (_) {}
   showTimeDisplay(ttsLoopMode === 'overlap' ? '🎞 TTS: 오버랩(음량↓)' : '⏸ TTS: 일시정지');
 }
 
