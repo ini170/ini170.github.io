@@ -1809,6 +1809,7 @@ let playlistHostSnapshotTimer = 0;
 let playlistImportStatusTimer = null;
 let playlistHostSnapshotPending = false;
 let playlistPendingHostAccessResult = null;
+let playlistPendingStagePromise = Promise.resolve();
 let playlistFolderReconnectNoticeKey = '';
 let playlistHostedMode = new URLSearchParams(location.search).get('embedded') === '1';
 let playlistAccessHostKnown = !playlistHostedMode; // 부모의 실제 핸들 개수 응답 수신 여부
@@ -3062,6 +3063,13 @@ window.addEventListener('message', e => {
     }
     else if (c === 'vp-import-progress' && e.source === parent) {
       _setPlaylistImportStatus(e.data.message || '');
+    }
+    else if (c === 'vp-access-stage-files' && e.source === parent) {
+      playlistPendingStagePromise = _stageHostedPlaylistRecords(e.data).catch(error => {
+        console.warn('[Playlist stage] 선택 직후 항목 저장 실패', error);
+        showTimeDisplay('⚠ 파일 연결은 메인 저장소에 보관했지만 재생목록 표시 저장에 실패했습니다.', 9000);
+        return false;
+      });
     }
     else if (c === 'vp-access-import-files' && e.source === parent) {
       _applyImportedPlaylistFolder(e.data, null);
@@ -8268,6 +8276,7 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
   // the saved playlist has been restored so this import merges into the real rows
   // instead of racing the initial restore and losing the newly linked handles.
   await _playlistBootstrapReady;
+  await playlistPendingStagePromise;
   clearTimeout(playlistHostRequestTimer);
   clearTimeout(playlistHostSnapshotTimer);
   playlistHostSnapshotPending = false;
@@ -8282,9 +8291,9 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
       srt:record.srtFile || null,
       videoHandle:record.videoHandle || null,
       srtHandle:record.srtHandle || null,
-      videoPath:record.videoPath || record.videoFile.name || '',
+      videoPath:record.videoPath || '',
       sourceRootName:record.sourceRootName || String(rootHandle?.name || ''),
-      srtPath:record.srtFile ? (record.srtPath || record.srtFile.name || '') : '',
+      srtPath:record.srtFile ? (record.srtPath || '') : '',
       placeholderVideoName:record.videoFile.name || '',
       placeholderSrtName:record.srtFile?.name || '',
       videoAccessStatus:'ready',
@@ -8305,7 +8314,8 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
 
   _playlistRecoveryManifestIsExplicitlyEmpty = false;
   const replace = payload?.replace === true;
-  const startIndex = playlist.length;
+  const requestedStartIndex = Number(payload?.stageStartIndex);
+  const startIndex = Number.isInteger(requestedStartIndex) ? requestedStartIndex : playlist.length;
   let relinkedIndices = [];
   let addedCount = imported.length;
   if (replace) {
@@ -8316,9 +8326,18 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
     lastSelectedIndex = -1;
     currentIndex = 0;
   } else {
-    const merged = _mergeImportedPlaylistItems(imported);
-    relinkedIndices = merged.relinkedIndices;
-    addedCount = merged.addedCount;
+    const stagedIndexes = [];
+    const remaining = [];
+    for (const item of imported) {
+      const stagedIndex = playlist.findIndex(existing => existing && String(existing.accessId || '') === String(item.accessId || ''));
+      if (stagedIndex >= 0) {
+        playlist[stagedIndex] = item;
+        stagedIndexes.push(stagedIndex);
+      } else remaining.push(item);
+    }
+    const merged = _mergeImportedPlaylistItems(remaining);
+    relinkedIndices = stagedIndexes.concat(merged.relinkedIndices);
+    addedCount = stagedIndexes.length + merged.addedCount;
     if (startIndex === 0) currentIndex = 0;
   }
   playlistRootConnectionKnown = true;
@@ -8584,47 +8603,83 @@ function _adoptHostedAccessEntries(entries) {
 
 // 최상위 페이지가 승인된 모든 FileHandle에서 꺼낸 File을 한 번에 적용한다.
 // 항목은 accessId로 찾으므로 서로 다른 폴더/드라이브여도 순서나 이름에 의존하지 않는다.
+function _playlistItemFromHostedAccessRecord(record = {}) {
+  const expectsSrt = !!(record.expectedSrt || record.srtName || record.srtPath || record.srtFile || record.srtHandle);
+  return {
+    accessId:String(record.accessId || _newPlaylistAccessId()),
+    hostAccess:true,
+    video:record.videoFile || null,
+    srt:record.srtFile || null,
+    videoHandle:record.videoHandle || null,
+    srtHandle:record.srtHandle || null,
+    // 파일명은 경로가 아니다. 상대경로를 얻지 못한 항목은 빈 경로로 보존한다.
+    videoPath:record.videoPath || '',
+    srtPath:record.srtPath || '',
+    sourceRootName:record.sourceRootName || '',
+    placeholderVideoName:record.videoFile?.name || record.videoName || record.videoHandle?.name || '',
+    placeholderSrtName:record.srtFile?.name || record.srtName || record.srtHandle?.name || '',
+    videoAccessStatus:record.videoAccessStatus || (record.videoFile ? 'ready' : 'checking'),
+    srtAccessStatus:expectsSrt ? (record.srtAccessStatus || (record.srtFile ? 'ready' : 'checking')) : 'none',
+    videoAccessError:record.videoAccessError || '',
+    srtAccessError:record.srtAccessError || '',
+    videoMissing:record.videoAccessStatus === 'missing',
+    srtMissing:record.srtAccessStatus === 'missing',
+    needsPermission:record.videoAccessStatus === 'permission',
+    needsSrtPermission:record.srtAccessStatus === 'permission'
+  };
+}
+
 function _seedPlaylistFromHostedAccessRecords(payload, records) {
   if (!_playlistRestoreComplete || playlist.length || _playlistRecoveryManifestIsExplicitlyEmpty) return false;
   const ordered = records.map((record, order) => ({
     record,
-    index: Number.isInteger(Number(record?.index)) ? Number(record.index) : order
+    index:Number.isInteger(Number(record?.index)) ? Number(record.index) : order
   })).filter(entry => {
     const record = entry.record || {};
     return !!(record.accessId || record.videoName || record.videoPath || record.videoFile || record.videoHandle);
   }).sort((a, b) => a.index - b.index);
   if (!ordered.length) return false;
 
-  playlist = ordered.map(({ record }) => {
-    const expectsSrt = !!(record.expectedSrt || record.srtName || record.srtPath || record.srtFile || record.srtHandle);
-    return {
-      accessId: String(record.accessId || _newPlaylistAccessId()),
-      hostAccess: true,
-      video: record.videoFile || null,
-      srt: record.srtFile || null,
-      videoHandle: record.videoHandle || null,
-      srtHandle: record.srtHandle || null,
-      videoPath: record.videoPath || record.videoName || '',
-      srtPath: record.srtPath || record.srtName || '',
-      sourceRootName: record.sourceRootName || '',
-      placeholderVideoName: record.videoFile?.name || record.videoName || record.videoHandle?.name || '',
-      placeholderSrtName: record.srtFile?.name || record.srtName || record.srtHandle?.name || '',
-      videoAccessStatus: record.videoAccessStatus || (record.videoFile ? 'ready' : 'unlinked'),
-      srtAccessStatus: expectsSrt ? (record.srtAccessStatus || (record.srtFile ? 'ready' : 'unlinked')) : 'none',
-      videoAccessError: record.videoAccessError || '',
-      srtAccessError: record.srtAccessError || '',
-      videoMissing: record.videoAccessStatus === 'missing',
-      srtMissing: record.srtAccessStatus === 'missing',
-      needsPermission: record.videoAccessStatus === 'permission',
-      needsSrtPermission: record.srtAccessStatus === 'permission'
-    };
-  });
+  playlist = ordered.map(({ record }) => _playlistItemFromHostedAccessRecord(record));
   const requestedIndex = Number(payload.playIndex);
   currentIndex = Math.max(0, Math.min(Number.isInteger(requestedIndex) ? requestedIndex : 0, playlist.length - 1));
   playlistHostHasHandles = true;
   playlistRootPermissionState = 'host';
   _playlistRecoveryManifestIsExplicitlyEmpty = false;
   return true;
+}
+
+async function _stageHostedPlaylistRecords(payload = {}) {
+  await _playlistBootstrapReady;
+  const records = Array.isArray(payload.records) ? payload.records : [];
+  const existingIds = new Set(playlist.map(item => String(item?.accessId || '')).filter(Boolean));
+  const ordered = records.map((record, order) => ({
+    record,
+    index:Number.isInteger(Number(record?.index)) ? Number(record.index) : order
+  })).filter(({ record }) => record?.accessId && (record.videoName || record.videoPath))
+    .sort((a, b) => a.index - b.index);
+  const staged = ordered
+    .filter(({ record }) => !existingIds.has(String(record.accessId)))
+    .map(({ record }) => ({
+      ..._playlistItemFromHostedAccessRecord(record),
+      video:null, srt:null, videoHandle:null, srtHandle:null,
+      videoAccessStatus:'checking', srtAccessStatus:record.expectedSrt ? 'checking' : 'none',
+      needsPermission:false, needsSrtPermission:false
+    }));
+  if (!staged.length) return true;
+
+  // 부모 IndexedDB 핸들 커밋 뒤, 파일 읽기보다 먼저 이름·accessId·순번을 재생목록에 기록한다.
+  playlist.push(...staged);
+  _playlistRecoveryManifestIsExplicitlyEmpty = false;
+  playlistHostHasHandles = true;
+  playlistRootConnectionKnown = true;
+  playlistAccessHostKnown = true;
+  renderPlaylist();
+  clearTimeout(_saveTimer);
+  _saveTimer = null;
+  const saved = await _savePlaylistToDB();
+  if (!saved) showTimeDisplay('⚠ 파일 연결은 보관했지만 재생목록 행 저장에 실패했습니다.', 9000);
+  return saved;
 }
 
 async function _applyHostedAccessFiles(payload = {}) {
@@ -8641,6 +8696,16 @@ async function _applyHostedAccessFiles(payload = {}) {
     return { ignored:true, explicitlyCleared:true };
   }
   if (!playlist.length && records.length) _seedPlaylistFromHostedAccessRecords(payload, records);
+  else if (playlist.length && records.length && !_playlistRecoveryManifestIsExplicitlyEmpty) {
+    const knownIds = new Set(playlist.map(item => String(item?.accessId || '')).filter(Boolean));
+    const missingRecords = records.filter(record => record?.accessId && record?.videoName && !knownIds.has(String(record.accessId)))
+      .sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
+    if (missingRecords.length) {
+      // 부모 저장소에 먼저 커밋된 새 핸들이 자식 목록 저장 전에 새로고침된 경우도 행으로 복원한다.
+      _mergeImportedPlaylistItems(missingRecords.map(_playlistItemFromHostedAccessRecord));
+      _playlistRecoveryManifestIsExplicitlyEmpty = false;
+    }
+  }
 
   clearTimeout(playlistHostRequestTimer);
   playlistPermissionBusy = false;
@@ -8665,7 +8730,7 @@ async function _applyHostedAccessFiles(payload = {}) {
     if (record.srtHandle) item.srtHandle = record.srtHandle;
     if (record.videoFile) {
       item.video = record.videoFile;
-      item.videoPath = record.videoPath || item.videoPath || record.videoFile.name || '';
+      item.videoPath = record.videoPath || item.videoPath || '';
       item.placeholderVideoName = record.videoFile.name || record.videoName || item.placeholderVideoName || '';
       _setPlaylistFileAccessStatus(item, 'video', 'ready');
     } else if (record.videoName) {
@@ -11389,15 +11454,35 @@ async function openFilePickerFSA() {
     const videoHandles = handles.filter(h => VIDEO_EXT.test(h.name));
     const srtHandles   = handles.filter(h => h.name.toLowerCase().endsWith('.srt'));
     if (!videoHandles.length) { showTimeDisplay('⚠ 동영상 파일이 없습니다'); return; }
+    await _playlistBootstrapReady;
 
     const startIndex = playlist.length;
-    const imported = [];
+    const stageRows = videoHandles.map(vh => ({
+      accessId:_newPlaylistAccessId(), hostAccess:false,
+      video:null, srt:null, videoHandle:vh, srtHandle:null,
+      videoPath:'', srtPath:'', sourceRootName:'',
+      placeholderVideoName:vh.name, placeholderSrtName:'',
+      videoAccessStatus:'checking', srtAccessStatus:'none',
+      videoMissing:false, srtMissing:false, needsPermission:false, needsSrtPermission:false
+    }));
+    const stagedMerge = _mergeImportedPlaylistItems(stageRows);
+    renderPlaylist();
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+    const stagedSaved = await _savePlaylistToDB();
+    if (!stagedSaved) {
+      showTimeDisplay('⚠ 파일은 열렸지만 선택 직후 파일 연결을 저장하지 못했습니다. 브라우저 저장소를 확인한 뒤 다시 선택해 주세요.', 9000);
+      return false;
+    }
+    // 경로 탐색과 영상 바이트 읽기보다 먼저 가장 최근 선택 핸들도 기록한다.
+    try { await _saveLastFilePickerHandle(videoHandles[videoHandles.length - 1]); } catch(_) {}
+
     const locations = new Map();
     for (const handle of handles){
       try { locations.set(handle, await _playlistResolveKnownFileLocation(handle)); }
       catch(_) { locations.set(handle, null); }
     }
-    for (const vh of videoHandles) {
+    const pairs = videoHandles.map((vh, offset) => {
       const videoLocation = locations.get(vh);
       const vBase = vh.name.substring(0, vh.name.lastIndexOf('.')).toLowerCase();
       const candidates = srtHandles.filter(s => {
@@ -11414,32 +11499,63 @@ async function openFilePickerFSA() {
         if (sameDirectory.length === 1) sh = sameDirectory[0];
       } else if (candidates.length === 1) sh = candidates[0];
       const srtLocation = sh ? locations.get(sh) : null;
-      const videoFile = await vh.getFile();
-      const srtFile   = sh ? await sh.getFile() : null;
+      const stagedIndex = playlist.findIndex(item => item?.accessId === stageRows[offset].accessId);
+      if (stagedIndex >= 0) {
+        const staged = playlist[stagedIndex];
+        staged.videoPath = videoLocation?.path || '';
+        staged.sourceRootName = videoLocation?.sourceRootName || '';
+        staged.srtHandle = sh;
+        staged.srtPath = srtLocation?.path || '';
+        staged.placeholderSrtName = sh?.name || '';
+        staged.srtAccessStatus = sh ? 'checking' : 'none';
+      }
+      return { vh, videoLocation, sh, srtLocation, accessId:stageRows[offset].accessId };
+    });
+    // 발견된 상대경로와 짝지은 SRT 연결도 getFile() 전에 저장한다.
+    if (!(await _savePlaylistToDB())) {
+      showTimeDisplay('⚠ SRT/상대경로 연결을 재생목록 저장소에 기록하지 못했습니다.', 9000);
+      return false;
+    }
+
+    const imported = [];
+    for (const pair of pairs) {
+      const videoFile = await pair.vh.getFile();
+      const srtFile = pair.sh ? await pair.sh.getFile() : null;
       imported.push({
-        accessId:_newPlaylistAccessId(), hostAccess:false,
-        video:videoFile, srt:srtFile, videoHandle:vh, srtHandle:sh,
-        videoPath:videoLocation?.path || '', srtPath:srtLocation?.path || '',
-        sourceRootName:videoLocation?.sourceRootName || '',
+        accessId:pair.accessId, hostAccess:false,
+        video:videoFile, srt:srtFile, videoHandle:pair.vh, srtHandle:pair.sh,
+        videoPath:pair.videoLocation?.path || '', srtPath:pair.srtLocation?.path || '',
+        sourceRootName:pair.videoLocation?.sourceRootName || '',
         placeholderVideoName:videoFile.name || '', placeholderSrtName:srtFile?.name || '',
         videoAccessStatus:'ready', srtAccessStatus:srtFile ? 'ready' : 'none',
         videoMissing:false, srtMissing:false, needsPermission:false, needsSrtPermission:false
       });
       if (srtFile) console.log(`SRT 매칭: ${videoFile.name} ← ${srtFile.name}`);
-    }    const merged = _mergeImportedPlaylistItems(imported);
-    // 마지막으로 선택한 파일 핸들 저장 — 다음 파일선택 다이얼로그가 그 폴더에서 열림
-    try { await _saveLastFilePickerHandle(videoHandles[videoHandles.length - 1]); } catch(_) {}
+    }
+    const stagedIndices = [];
+    const remaining = [];
+    for (const item of imported) {
+      const stagedIndex = playlist.findIndex(existing => existing && String(existing.accessId || '') === String(item.accessId || ''));
+      if (stagedIndex >= 0) {
+        playlist[stagedIndex] = item;
+        stagedIndices.push(stagedIndex);
+      } else remaining.push(item);
+    }
+    const mergeRemaining = _mergeImportedPlaylistItems(remaining);
+    const merged = {
+      relinkedIndices:stagedMerge.relinkedIndices.concat(stagedIndices, mergeRemaining.relinkedIndices),
+      addedCount:stagedIndices.length + mergeRemaining.addedCount
+    };
     renderPlaylist();
     if (startIndex === 0 && playlist.length > 0) {
       currentIndex = 0;
       loadVideo(0);
       video.play();
     }
-    // 파일 추가 직후 즉시 저장 (debounce 우회) — F5 즉시 눌러도 복원 가능하도록 트랜잭션 완료까지 대기
     await _savePlaylistToDB();
     const relinked = merged.relinkedIndices.length;
     const pathlessCount = imported.filter(item => !item.videoPath).length;
-    const pathNote = pathlessCount ? ` · ${pathlessCount}개 실제 경로 미기록(다른 PC 복원은 상위 폴더 연결 필요)` : '';
+    const pathNote = pathlessCount ? ` · ${pathlessCount}개 OS 상대경로 미기록(브라우저 파일 연결은 저장됨)` : '';
     showTimeDisplay(`💾 ${videoHandles.length}개 처리${relinked ? ` · 기존 목록 ${relinked}개 다시 연결` : ''}${merged.addedCount ? ` · 새 항목 ${merged.addedCount}개 추가` : ''}${pathNote} (F5 복원 가능)`);  } catch(e) {
     if (e.name !== 'AbortError') {
       console.warn('[FSA] 파일 선택 실패', e);
