@@ -7452,6 +7452,10 @@ function _mergeImportedPlaylistItems(imported) {
 // 부모가 여러 폴더/드라이브에서 찾은 영상·SRT File과 FileHandle을 목록에 더한다.
 // 최상위 권한 레지스트리와 자식 재생목록 양쪽에 같은 핸들을 저장해 한쪽 유실을 복구한다.
 async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
+  // A picker can finish before the delayed IndexedDB/settings bootstrap. Wait until
+  // the saved playlist has been restored so this import merges into the real rows
+  // instead of racing the initial restore and losing the newly linked handles.
+  await _playlistBootstrapReady;
   clearTimeout(playlistHostRequestTimer);
   clearTimeout(playlistHostSnapshotTimer);
   playlistHostSnapshotPending = false;
@@ -7527,21 +7531,25 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
   }
 
   renderPlaylist();
-  void _savePlaylistToDB();
   const repairedCurrent = relinkedIndices.includes(currentIndex);
+  let autoPlayTarget = -1;
   if (replace || startIndex === 0 || repairedCurrent) {
     const targetIndex = repairedCurrent ? currentIndex : 0;
     const loaded = loadVideo(targetIndex);
-    if (loaded !== false && payload?.autoPlay !== false) video.play().catch(() => {});
+    if (loaded !== false) autoPlayTarget = targetIndex;
   }
-  const details = [
-    `영상 ${imported.length}개 처리`,
-    relinkedIndices.length ? `기존 목록 ${relinkedIndices.length}개 다시 연결` : '',
-    addedCount ? `새 항목 ${addedCount}개 추가` : '',
-    imported.some(item => item.srt) ? 'SRT 자동 연결' : ''
-  ].filter(Boolean).join(' · ');
-  _setPlaylistImportStatus(payload?.storageWarning || '');
-  hideTimeDisplay();
+  // Do not report a completed reconnect until both the playlist row and its
+  // FileSystem handles have reached the child's IndexedDB transaction commit.
+  const playlistSaved = await _savePlaylistToDB();
+  if (!playlistSaved) {
+    const message = '⚠ 파일은 연결했지만 재생목록 저장에 실패했습니다. 새로고침하면 다시 연결해야 합니다.';
+    _setPlaylistImportStatus(message, 9000);
+    showTimeDisplay(message, 9000);
+  } else {
+    _setPlaylistImportStatus(payload?.storageWarning || '');
+    if (!payload?.storageWarning) hideTimeDisplay();
+  }
+  if (autoPlayTarget >= 0 && payload?.autoPlay !== false) video.play().catch(() => {});
   _updatePlaylistPermissionUI();
   return true;
 }
@@ -9685,6 +9693,7 @@ video.addEventListener('volumechange', () => {
 const _IDB_NAME = 'iniVideoPlayer';
 const _IDB_VER  = 1;
 let   _idb      = null;
+let   _playlistBootstrapReady = Promise.resolve(false);
 
 function _openIDB() {
   return new Promise((resolve, reject) => {
@@ -9709,7 +9718,7 @@ function schedulePlaylistSave() {
 }
 
 async function _savePlaylistToDB() {
-  if (!_idb) return;
+  if (!_idb) return false;
   try {
     const tx    = _idb.transaction(['playlist', 'meta'], 'readwrite');
     const store = tx.objectStore('playlist');
@@ -9747,7 +9756,11 @@ async function _savePlaylistToDB() {
     });
     _registerPlaylistAccessHandlesWithHost();
     _syncPlaylistAccessManifestWithHost();
-  } catch(e) { console.warn('[IDB] 저장 실패', e); }
+    return true;
+  } catch(e) {
+    console.warn('[IDB] 저장 실패', e);
+    return false;
+  }
 }
 
 async function _savePlaylistRootHandle(handle) {
@@ -10189,26 +10202,38 @@ async function _getLastFilePickerHandle() {
 // 앱 시작 시 DB 열고 자동 복원 (사용자 조작 없음)
 // - F5(같은 세션): queryPermission → 'granted' → 즉시 복원
 // - 브라우저 재시작: queryPermission → 'prompt' → 조용히 스킵
-_openIDB().then(db => {
+_playlistBootstrapReady = _openIDB().then(async db => {
   _settingsDBReady = !!db;
-  void _restoreSettingsFromIDB()
-    .catch(error => console.warn('[Settings] 저장 옵션 복원 실패', error))
-    .finally(() => {
-      // 설정을 먼저 확정·적용한 뒤 영상 복원을 시작해 기본 재생 초기화가 덮지 않게 한다.
-      _completeSettingsBootstrap();
-      if (!db) return;
-      const revision = playlistLastPickerRevision;
-      void _getLastFilePickerHandle().then(handle => {
-        if (revision === playlistLastPickerRevision) playlistLastPickerHandle = handle;
-      });
-      void _restorePlaylistFromDB().catch(error => console.warn('[IDB] 재생목록 복원 실패', error));
-    });
-}).catch(error => {
+  try {
+    await _restoreSettingsFromIDB();
+  } catch(error) {
+    console.warn('[Settings] 저장 옵션 복원 실패', error);
+  }
+  // 설정을 먼저 확정·적용한 뒤 영상 복원을 시작해 기본 재생 초기화가 덮지 않게 한다.
+  _completeSettingsBootstrap();
+  if (!db) return false;
+  const revision = playlistLastPickerRevision;
+  void _getLastFilePickerHandle().then(handle => {
+    if (revision === playlistLastPickerRevision) playlistLastPickerHandle = handle;
+  });
+  try {
+    await _restorePlaylistFromDB();
+    return true;
+  } catch(error) {
+    console.warn('[IDB] 재생목록 복원 실패', error);
+    return false;
+  }
+}).catch(async error => {
   _settingsDBReady = false;
   console.warn('[IDB] 초기화 실패', error);
-  void _restoreSettingsFromIDB()
-    .catch(restoreError => console.warn('[Settings] 저장 옵션 복원 실패', restoreError))
-    .finally(() => _completeSettingsBootstrap());
+  try {
+    await _restoreSettingsFromIDB();
+  } catch(restoreError) {
+    console.warn('[Settings] 저장 옵션 복원 실패', restoreError);
+  } finally {
+    _completeSettingsBootstrap();
+  }
+  return false;
 });
 /* ===== 저대비(스텔스) 모드 — Ctrl+H 토글 (단어카드와 동일 컨셉) =====
    영상·UI 전체를 흑백+감광(brightness .4) 처리해 흘끗 봐서는 어두운 창으로만 보이게.
