@@ -10462,6 +10462,43 @@ function installOverlayShiftInteraction() {
     updateOverlayShiftTarget();
   });
 
+  const overlayScaleWheelRemainders = Object.create(null);
+  let overlayScaleWheelSaveTimer = null;
+  const overlayScaleWheelThreshold = 80;
+  container.addEventListener('wheel', event => {
+    if (!event.shiftKey || !event.deltaY || audioOnlyMode) return;
+    const target = findOverlayTextTargetAt(event.clientX, event.clientY);
+    if (!target) return;
+
+    // 글자 위 Shift+휠만 소비하고, 일반 휠/빈 영상 영역은 기존 동작에 맡긴다.
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaY = event.deltaMode === 1 ? event.deltaY * (overlayScaleWheelThreshold / 3) :
+      (event.deltaMode === 2 ? event.deltaY * overlayScaleWheelThreshold : event.deltaY);
+    if (!Number.isFinite(deltaY) || !deltaY) return;
+
+    const previous = overlayScaleWheelRemainders[target.key] || 0;
+    const accumulated = previous && Math.sign(previous) !== Math.sign(deltaY) ? deltaY : previous + deltaY;
+    const steps = Math.trunc(accumulated / overlayScaleWheelThreshold);
+    overlayScaleWheelRemainders[target.key] = accumulated - steps * overlayScaleWheelThreshold;
+    if (!steps) return;
+
+    let current;
+    let applyScale;
+    if (target.key === 'subtitle') { current = subOverlayScale; applyScale = setSubOverlayScaleFromSlider; }
+    else if (target.key === 'translation') { current = transOverlayScale; applyScale = setTransOverlayScaleFromSlider; }
+    else { current = hanziOverlayScale; applyScale = setHanziOverlayScaleFromSlider; }
+    const next = normalizeOverlayScale(current - steps * 0.05);
+    if (next === null || next === current) return;
+    applyScale(next, false);
+
+    clearTimeout(overlayScaleWheelSaveTimer);
+    overlayScaleWheelSaveTimer = setTimeout(() => {
+      overlayScaleWheelSaveTimer = null;
+      try { saveSettings(); } catch (_) {}
+    }, 300);
+  }, { passive:false, capture:true });
+
   const handleShift = event => {
     if (event.key !== 'Shift') return;
     overlayInteractionShiftHeld = event.type === 'keydown';
