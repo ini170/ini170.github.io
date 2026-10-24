@@ -2759,7 +2759,11 @@ async function openPlaylistItemLocation(index = _playlistLocationTargetIndex()) 
 
   const payload = {
     llt:'vp-access-open-location', accessId:String(item.accessId || ''),
-    itemIndex:index, kind:'video', name:_playlistFileName(item, 'video')
+    itemIndex:index, kind:'video', name:_playlistFileName(item, 'video'),
+    handle:item.videoHandle || null,
+    path:_playlistBestKnownPath(item.videoPath, item.video?.webkitRelativePath),
+    relativePath:String(item.video?.webkitRelativePath || ''),
+    sourceRootName:String(item.sourceRootName || '')
   };
   if (_isEmbeddedPlaylistPlayer() && window.parent !== window) {
     playlistPickerBusy = true;
@@ -2776,7 +2780,11 @@ async function openPlaylistItemLocation(index = _playlistLocationTargetIndex()) 
       console.warn('[FSA] 연결 위치 직접 열기 실패', error);
     }
     if (!calledDirectly) {
-      try { parent.postMessage(payload, '*'); }
+      try {
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.handle;
+        parent.postMessage(fallbackPayload, '*');
+      }
       catch (error) {
         _finishPlaylistLocationRequest();
         showTimeDisplay('⚠ 연결 위치를 열지 못했습니다', 6000);
@@ -9103,6 +9111,12 @@ function addFilesToPlaylist(files, autoPlay, handleMap = new Map(), dropOptions 
     });
     if (srt) console.log('SRT 매칭: ' + vf.name + ' ← ' + srt.name);
   });
+
+  const unlinkedImports = imported.filter(item => !item.videoHandle || (item.srt && !item.srtHandle));
+  if (_isEmbeddedPlaylistPlayer() && unlinkedImports.length) {
+    showTimeDisplay(`⚠ ${unlinkedImports.length}개 항목에서 저장 가능한 영상·SRT 연결 핸들을 얻지 못해 목록에 넣지 않았습니다. 파일/폴더 추가 버튼을 사용해 주세요.`, 9000);
+    return 0;
+  }
 
   let targetIndex = -1;
   const mode = dropOptions?.mode || '';
