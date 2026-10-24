@@ -1261,8 +1261,8 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
     <!-- SRT 편집 -->
     <div id="editorSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; padding:10px; flex:1; min-height:150px; overflow:hidden; display:flex; flex-direction:column;">
       <h4 style="margin:0 0 8px 0; color:#aaa; font-size:13px;">SRT 편집</h4>
-      <textarea id="editor" style="flex:1; background:#111; color:#0f0; border:1px solid #333; padding:8px; box-sizing:border-box; font-family:monospace; font-size:12px; margin-bottom:8px; overflow-y:auto;"></textarea>
-      <button onclick="applyEdit()" style="padding:6px 12px; background:#444; color:#fff; border:2px solid transparent; cursor:pointer; border-radius:3px; font-size:12px;">적용</button>
+      <textarea id="editor" placeholder="연결된 SRT 파일을 선택하면 자막 내용이 여기에 표시됩니다." style="flex:1; background:#111; color:#0f0; border:1px solid #333; padding:8px; box-sizing:border-box; font-family:monospace; font-size:12px; margin-bottom:8px; overflow-y:auto;"></textarea>
+      <button onclick="applyEdit(event)" style="padding:6px 12px; background:#444; color:#fff; border:2px solid transparent; cursor:pointer; border-radius:3px; font-size:12px;">적용</button>
     </div>
   </div>
 </div>
@@ -6943,13 +6943,114 @@ async function triggerTtsPhase(sub, afterTts) {
   playTtsSequence(items, 0, wrappedAfterTts);
 }
 
-function applyEdit(){
-  subtitles=parseSRT(editor.value);
+async function applyEdit(event){
+  if (!event || event.isTrusted !== true) {
+    showTimeDisplay('SRT 저장은 적용 버튼을 직접 눌러 실행해 주세요.', 5000);
+    return false;
+  }
+  const item = playlist[currentIndex];
+  if (!item) {
+    showTimeDisplay('먼저 재생목록에서 영상을 선택해 주세요.', 5000);
+    return false;
+  }
+  const srtText = String(editor.value || '');
+  const parsed = parseSRT(srtText.replace(/^\uFEFF/, ''));
+  const timeLineCount = (srtText.match(/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/g) || []).length;
+  if (!parsed.length || parsed.length !== timeLineCount || parsed.some(sub => !Number.isFinite(sub.start) || !Number.isFinite(sub.end) || sub.end <= sub.start)) {
+    showTimeDisplay('모든 자막 구간을 올바르게 읽지 못했습니다. 편집 내용을 확인했으며 파일은 변경하지 않았습니다.', 6500);
+    return false;
+  }
+
+  let saveResult = null;
+  let parentBridgeUsed = false;
+  const payload = {
+    accessId:String(item.accessId || ''), itemIndex:currentIndex, text:srtText,
+    fileName:item.srt?.name || item.placeholderSrtName || item.srtHandle?.name || 'subtitles.srt',
+    path:String(item.srtPath || item.srt?.name || item.placeholderSrtName || ''),
+    sourceRootName:String(item.sourceRootName || '')
+  };
+  if (_isEmbeddedPlaylistPlayer() && window.parent !== window) {
+    try {
+      const parentWriter = parent.vpAccessHostWriteSrtFromPlayer;
+      if (typeof parentWriter === 'function') {
+        parentBridgeUsed = true;
+        saveResult = await parentWriter(payload, true);
+      }
+    } catch (error) {
+      console.warn('[SRT edit] 상위 파일 저장 요청 실패', error);
+      saveResult = { ok:false, message:'상위 페이지의 SRT 파일 저장 연결에 실패했습니다. 파일은 변경하지 않았습니다.' };
+    }
+  }
+
+  if (!parentBridgeUsed && (!saveResult || ['no-handle','picker-unavailable'].includes(saveResult.code)) && (item.srtHandle || typeof window.showSaveFilePicker === 'function')) {
+    let writer = null;
+    let handle = item.srtHandle || null;
+    let savedAs = false;
+    try {
+      if (!handle) {
+        const pickPromise = window.showSaveFilePicker({
+          suggestedName:payload.fileName,
+          types:[{ description:'SubRip 자막', accept:{ 'application/x-subrip':['.srt'], 'text/plain':['.srt'] } }]
+        });
+        handle = await pickPromise;
+        item.srtHandle = handle;
+        item.srtPath = handle.name || payload.path;
+        item.accessId = item.accessId || _newPlaylistAccessId();
+        savedAs = true;
+        if (!await _savePlaylistToDB()) throw new Error('저장한 SRT 파일 연결을 재생목록 DB에 기록하지 못했습니다.');
+      }
+      if (typeof handle.createWritable !== 'function') throw new Error('이 SRT 파일은 쓰기 핸들을 제공하지 않습니다.');
+      let permission = 'granted';
+      if (!savedAs) {
+        if (typeof handle.requestPermission !== 'function') throw new Error('이 SRT 파일은 쓰기 권한 요청을 제공하지 않습니다.');
+        // 적용 버튼의 실제 클릭에서 await 전에 권한 요청을 시작한다.
+        const permissionRequest = handle.requestPermission({ mode:'readwrite' });
+        permission = await permissionRequest;
+      }
+      if (permission !== 'granted') {
+        saveResult = { ok:false, message:'SRT 파일 쓰기 권한이 허용되지 않아 파일과 재생 자막을 변경하지 않았습니다.' };
+      } else {
+        writer = await handle.createWritable();
+        await writer.write(srtText);
+        await writer.close();
+        writer = null;
+        saveResult = { ok:true, name:handle.name || item.srt?.name || 'SRT', savedAs };
+      }
+    } catch (error) {
+      console.warn('[SRT edit] 원본 SRT 저장 실패', error);
+      saveResult = { ok:false, message:error?.name === 'AbortError'
+        ? 'SRT 저장 위치 선택을 취소했습니다. 파일과 재생 자막은 변경하지 않았습니다.'
+        : `SRT 파일 저장 실패 (${error?.name || '오류'}). 파일과 재생 자막은 변경하지 않았습니다.` };
+    } finally {
+      if (writer) { try { await writer.abort(); } catch (_) {} }
+    }
+  }
+
+  if (!saveResult) {
+    saveResult = { ok:false, message:'저장 가능한 원본 SRT 파일 연결이 없습니다. 자막 파일을 다시 추가한 뒤 적용해 주세요.' };
+  }
+  if (saveResult.ok !== true) {
+    showTimeDisplay(saveResult.message || 'SRT 파일을 저장하지 못했습니다. 재생 자막은 변경하지 않았습니다.', 7000);
+    return false;
+  }
+
+  const fileName = saveResult.name || item.srt?.name || item.placeholderSrtName || item.srtHandle?.name || 'subtitles.srt';
+  item.srt = new File([srtText], fileName, { type:item.srt?.type || 'application/x-subrip', lastModified:Date.now() });
+  item.placeholderSrtName = fileName;
+  if (saveResult.path) item.srtPath = saveResult.path;
+  if (saveResult.accessId) item.accessId = saveResult.accessId;
+  _setPlaylistFileAccessStatus(item, 'srt', 'ready');
+  subtitles = parsed;
   renderSubs();
   loopMode = 'none';
   subPlayCount = 0;
   updateLoopStatus();
-  alert('자막이 업데이트되었습니다');
+  const playlistSaved = await _savePlaylistToDB();
+  const savedAction = saveResult.savedAs ? 'SRT 저장 위치 선택·적용 완료' : '원본 SRT 저장·적용 완료';
+  showTimeDisplay(playlistSaved
+    ? `${savedAction} · ${fileName}`
+    : `SRT 파일은 저장·적용됐지만 재생목록 연결정보 저장에 실패했습니다 · ${fileName}`, 6500);
+  return true;
 }
 
 function deselectAllItems(){
