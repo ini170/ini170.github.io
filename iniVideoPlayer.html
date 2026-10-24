@@ -960,7 +960,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
          background:#333; color:#aaa; border:1px solid #555; border-radius:0 4px 4px 0;
          cursor:pointer; padding:8px 4px; font-size:13px; writing-mode:vertical-rl; user-select:none;">◀</div>
 
-<input type="file" id="fileInput" multiple="" accept="video/*,.srt" style="display:none;">
+<input type="file" id="fileInput" multiple="" accept="video/*,audio/mpeg,.mp3,.srt" style="display:none;">
 
 <div id="mainContainer" style="display:flex; margin-top:20px; min-height:calc(100vh - 150px); overflow:visible; box-sizing:border-box; position:relative; min-width:400px;">
   <!-- 플로팅 토글 버튼 (항시 표시) -->
@@ -2376,7 +2376,7 @@ function handleFiles(files) {
   const fileArray = Array.from(files);
   const videoFiles = fileArray.filter(f => {
     const isVideoType = f.type && f.type.startsWith('video');
-    const isVideoExt = f.name.toLowerCase().match(/\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i);
+    const isVideoExt = f.name.toLowerCase().match(/\.(mp3|mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i);
     return isVideoType || isVideoExt;
   });
   const srtFiles = fileArray.filter(f => f.name.toLowerCase().endsWith('.srt'));
@@ -8378,7 +8378,7 @@ function movePlaylistItemDown() {
 }
 
 // ===== 파일 로딩 공통 =====
-const VIDEO_EXT = /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i;
+const VIDEO_EXT = /\.(mp3|mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i;
 
 // 파일 선택 폴백의 webkitRelativePath에서 폴더 내 상대경로를 보존한다.
 function _playlistInputFileLocation(file) {
@@ -8746,7 +8746,7 @@ async function getFilesFromEntries(entries) {
 // ===== 드롭 처리 공통 함수 =====
 // entry 기반으로 처리 — 파일/폴더 모두 지원, SRT 자동 형제 탐색 포함
 async function handleDropItems(dataTransfer, autoPlay) {
-  const VIDEO_EXT = /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i;
+  const VIDEO_EXT = /\.(mp3|mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i;
 
   // items API 사용 (폴더 접근 가능)
   const topEntries = [];
