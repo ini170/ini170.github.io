@@ -78,6 +78,7 @@ html {
   flex-shrink: 0;
   overflow: hidden;
   border: 2px solid #333;
+  touch-action: none;
 }
 
 video {
@@ -10564,7 +10565,129 @@ function toggleSubOverlay() {
   try { saveSettings(); } catch(_) {}
 }
 
+function installVideoTouchGestures() {
+  const container = document.getElementById('videoContainer');
+  const videoElement = container?.querySelector('video');
+  if (!container || !videoElement || container.dataset.touchGesturesReady === '1') return;
+  container.dataset.touchGesturesReady = '1';
+
+  const MOVE_CANCEL_THRESHOLD = 24;
+  const HORIZONTAL_SWIPE_THRESHOLD = 44;
+  const VOLUME_SWIPE_THRESHOLD = 28;
+  let gesture = null;
+
+  const commitVolumeGesture = state => {
+    if (!state || state.kind !== 'volume' || !state.volumeChanged) return;
+    const delta = Math.round((mainVolume - state.baseVolume) * 100) / 100;
+    if (Math.abs(delta) < 0.01) return;
+    scheduleMainVolumeSave();
+    showTimeDisplay(`${delta < 0 ? '🔉' : '🔊'} ${Math.round(mainVolume * 100)}%`);
+  };
+
+  const findTrackedTouch = list => {
+    if (!gesture) return null;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].identifier === gesture.touchId) return list[i];
+    }
+    return null;
+  };
+
+  const cancelGesture = () => {
+    commitVolumeGesture(gesture);
+    gesture = null;
+  };
+
+  container.addEventListener('touchstart', event => {
+    if (event.touches.length !== 1) {
+      cancelGesture();
+      return;
+    }
+    if (gesture || audioOnlyMode) return;
+
+    const touch = event.changedTouches[0] || event.touches[0];
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('#overlayInteractionHud, #playlistPermissionGate, button, input, select, textarea, a, [contenteditable="true"]')) return;
+
+    const rect = videoElement.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 100) return;
+    const nativeControlsHeight = Math.min(64, Math.max(44, rect.height * 0.18));
+    const gestureHeight = rect.height - nativeControlsHeight;
+    if (gestureHeight < 60 || touch.clientY >= rect.bottom - nativeControlsHeight) return;
+
+    const yRatio = Math.max(0, Math.min(1, (touch.clientY - rect.top) / gestureHeight));
+    gesture = {
+      touchId: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      zone: yRatio < 0.5 ? 'upper' : 'lower',
+      baseVolume: mainVolume,
+      kind: '',
+      moved: false,
+      volumeChanged: false,
+    };
+  }, { passive: true });
+
+  container.addEventListener('touchmove', event => {
+    if (!gesture || event.touches.length !== 1) return;
+    const touch = findTrackedTouch(event.touches);
+    if (!touch) return;
+
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (Math.max(absX, absY) >= MOVE_CANCEL_THRESHOLD) {
+      gesture.moved = true;
+      if (event.cancelable) event.preventDefault();
+    }
+
+    if (!gesture.kind) {
+      if (subtitles.length > 0 && absX >= HORIZONTAL_SWIPE_THRESHOLD && absX >= absY * 1.2) {
+        gesture.kind = 'subtitle';
+      } else if (absY >= VOLUME_SWIPE_THRESHOLD && absY >= absX * 1.2 &&
+          ((gesture.zone === 'upper' && dy < 0) || (gesture.zone === 'lower' && dy > 0))) {
+        gesture.kind = 'volume';
+      }
+    }
+
+    if (gesture.kind === 'volume') {
+      const rawVolume = gesture.baseVolume - dy / 1000;
+      const boundedVolume = gesture.zone === 'upper'
+        ? Math.max(gesture.baseVolume, Math.min(1, rawVolume))
+        : Math.min(gesture.baseVolume, Math.max(0, rawVolume));
+      const nextVolume = Math.round(boundedVolume * 100) / 100;
+      if (nextVolume !== mainVolume) {
+        mainVolume = nextVolume;
+        gesture.volumeChanged = true;
+        applyMainVolume();
+      }
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchend', event => {
+    if (!gesture) return;
+    const touch = findTrackedTouch(event.changedTouches);
+    if (!touch) return;
+    const state = gesture;
+    gesture = null;
+    if (state.moved && event.cancelable) event.preventDefault();
+
+    if (state.kind === 'subtitle') {
+      const dx = touch.clientX - state.startX;
+      const dy = touch.clientY - state.startY;
+      if (Math.abs(dx) >= HORIZONTAL_SWIPE_THRESHOLD && Math.abs(dx) >= Math.abs(dy) * 1.2) {
+        if (dx > 0) nextSub();
+        else prevSub();
+      }
+    } else if (state.kind === 'volume') {
+      commitVolumeGesture(state);
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchcancel', cancelGesture, { passive: true });
+}
 installOverlayShiftInteraction();
+installVideoTouchGestures();
 // ===== 레이아웃 프리셋 =====
 // 프리셋 0: 사용자가 저장, 프리셋 1: 영상 큰 버전 (기본 내장)
 // 사용자 저장 슬롯 (slot 0)
