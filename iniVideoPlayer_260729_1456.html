@@ -835,16 +835,35 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 }
 #hanziVideoOverlay.active { display: flex; }
 
-/* ===== Shift + hover on the existing video overlay text ===== */
-#overlay.on-video.shift-overlay-target {
+/* ===== Ctrl target sizing and temporary Shift options palette ===== */
+#overlay.on-video.ctrl-overlay-target {
   text-shadow: 0 0 6px #000, 0 2px 8px #000, 0 0 7px rgba(79,195,247,.95) !important;
 }
-#transVideoOverlay.shift-overlay-target .tvo-zh,
-#transVideoOverlay.shift-overlay-target .tvo-pyen,
-#transVideoOverlay.shift-overlay-target .tvo-ko,
-#hanziVideoOverlay.shift-overlay-target .char-card {
+#transVideoOverlay.ctrl-overlay-target .tvo-zh,
+#transVideoOverlay.ctrl-overlay-target .tvo-pyen,
+#transVideoOverlay.ctrl-overlay-target .tvo-ko,
+#hanziVideoOverlay.ctrl-overlay-target .char-card {
   filter: drop-shadow(0 0 3px rgba(79,195,247,.9));
 }
+#overlayScaleHint {
+  position:absolute; z-index:1001; display:none; max-width:calc(100% - 12px); padding:4px 8px;
+  border:1px solid rgba(79,195,247,.72); border-radius:6px; background:rgba(5,12,18,.86);
+  color:#b9eaff; font-size:11px; font-weight:700; line-height:1.3; white-space:nowrap;
+  pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.5);
+}
+#overlayOptionPalette {
+  position:absolute; z-index:1000; display:none; width:min(350px, calc(100% - 16px)); max-height:calc(100% - 16px);
+  box-sizing:border-box; overflow:auto; padding:8px; border:1px solid #46677a; border-radius:8px;
+  background:rgba(7,11,17,.94); color:#d7e5ee; box-shadow:0 4px 18px rgba(0,0,0,.7);
+  font:12px/1.3 system-ui, sans-serif; touch-action:pan-y;
+}
+#overlayOptionPalette .overlay-option-title { display:flex; justify-content:space-between; gap:8px; padding:0 2px 6px; color:#bceaff; font-weight:700; }
+#overlayOptionPalette .overlay-option-row { display:grid; grid-template-columns:44px 42px minmax(0,1fr) 38px; align-items:center; gap:4px; min-height:36px; border-top:1px solid rgba(130,160,180,.18); }
+#overlayOptionPalette .overlay-option-name { color:#d9e7ef; white-space:nowrap; }
+#overlayOptionPalette .overlay-option-toggle { min-width:0; padding:4px 2px; font-size:10px; }
+#overlayOptionPalette .overlay-option-slider { width:100%; min-width:0; height:30px; margin:0; accent-color:#4fc3f7; touch-action:pan-y; }
+#overlayOptionPalette .overlay-option-value { color:#81d4fa; text-align:right; font-variant-numeric:tabular-nums; }
+@media (pointer:coarse) { #overlayOptionPalette .overlay-option-slider { height:40px; } }
 
 /* ===== 오디오 전용 모드 바 ===== */
 
@@ -1010,7 +1029,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       </div>
       <!-- 드래그 수신용 투명 오버레이 (video 위에서 이벤트 가로채기) -->
       <div id="dropOverlay" style="position:absolute;inset:0;z-index:10;pointer-events:none;"></div>
-      <!-- Shift+클릭은 새 UI 없이 현재 영상 위 세 표시 문자열을 각각 전환합니다. -->
+      <!-- Ctrl 호버는 현재 문자열을 크기 조절 대상으로 강조하고, Shift 호버는 임시 전체 옵션을 띄웁니다. -->
       <!-- 번역 영상 위 오버레이 (중단 고정) -->
 
       <div id="transVideoOverlay">
@@ -10389,10 +10408,14 @@ function _updateAudioModeTitle() {
   }
 }
 
-// ===== Shift + hover: 기존 영상 위 문자열에서 직접 표시 전환 =====
+// ===== Ctrl hover: 문자열별 크기 대상 / Shift hover: 전체 오버레이 옵션 =====
 let overlayInteractionShiftHeld = false;
+let overlayInteractionCtrlHeld = false;
 let overlayInteractionPointer = null;
-const overlayShiftTargetClass = 'shift-overlay-target';
+let overlayInteractionPointerOverPalette = false;
+let overlayOptionPaletteNode = null;
+let overlayScaleHintNode = null;
+const overlayCtrlTargetClass = 'ctrl-overlay-target';
 
 function getOverlayTextRects(root) {
   if (!root) return [];
@@ -10422,10 +10445,11 @@ function findOverlayTextTargetAt(x, y) {
   const matches = [];
   for (const layer of layers) {
     if (!layer.enabled || !layer.element) continue;
-    const rects = getOverlayTextRects(layer.element);
-    if (!rects.some(rect => x >= rect.left - 3 && x <= rect.right + 3 && y >= rect.top - 3 && y <= rect.bottom + 3)) continue;
+    const rect = getOverlayTextRects(layer.element).find(r =>
+      x >= r.left - 3 && x <= r.right + 3 && y >= r.top - 3 && y <= r.bottom + 3);
+    if (!rect) continue;
     const z = Number.parseInt(getComputedStyle(layer.element).zIndex, 10);
-    matches.push({ ...layer, z:Number.isFinite(z) ? z : 0 });
+    matches.push({ ...layer, rect, z:Number.isFinite(z) ? z : 0 });
   }
   matches.sort((a,b) => {
     if (a.z !== b.z) return b.z - a.z;
@@ -10435,6 +10459,137 @@ function findOverlayTextTargetAt(x, y) {
   return matches[0] || null;
 }
 
+function overlayScaleValueForKey(key) {
+  if (key === 'subtitle') return subOverlayScale;
+  if (key === 'translation') return transOverlayScale;
+  if (key === 'hanzi') return hanziOverlayScale;
+  return null;
+}
+function setOverlayScaleValueForKey(key, value, persist = false) {
+  if (key === 'subtitle') setSubOverlayScaleFromSlider(value, persist);
+  else if (key === 'translation') setTransOverlayScaleFromSlider(value, persist);
+  else if (key === 'hanzi') setHanziOverlayScaleFromSlider(value, persist);
+}
+function overlayEnabledForKey(key) {
+  if (key === 'subtitle') return subOverlayMode;
+  if (key === 'translation') return transVideoOverlayEnabled;
+  if (key === 'hanzi') return hanziVideoOverlayEnabled;
+  return false;
+}
+function toggleOverlayForKey(key) {
+  if (key === 'subtitle') toggleSubOverlay();
+  else if (key === 'translation') toggleTransVideoOverlay();
+  else if (key === 'hanzi') toggleHanziVideoOverlay();
+}
+function syncOverlayOptionPalette() {
+  if (!overlayOptionPaletteNode) return;
+  const options = [
+    { key:'subtitle', label:'자막' },
+    { key:'translation', label:'번역' },
+    { key:'hanzi', label:'한자' },
+  ];
+  for (const option of options) {
+    const button = document.getElementById(`overlayOptionToggle-${option.key}`);
+    const slider = document.getElementById(`overlayOptionSlider-${option.key}`);
+    const output = document.getElementById(`overlayOptionValue-${option.key}`);
+    const enabled = overlayEnabledForKey(option.key);
+    const scale = overlayScaleValueForKey(option.key);
+    if (button) {
+      button.textContent = enabled ? '표시' : '숨김';
+      button.classList.toggle('active', enabled);
+      button.setAttribute('aria-pressed', String(enabled));
+      button.setAttribute('aria-label', `${option.label} 영상 위 표시 ${enabled ? '끄기' : '켜기'}`);
+    }
+    if (slider && Number.isFinite(scale) && document.activeElement !== slider) slider.value = String(scale);
+    if (output && Number.isFinite(scale)) output.textContent = `${Math.round(scale * 100)}%`;
+  }
+}
+
+function ensureOverlayModifierControls(container, queueScaleSave) {
+  if (overlayOptionPaletteNode && overlayScaleHintNode) return;
+  const palette = document.createElement('div');
+  palette.id = 'overlayOptionPalette';
+  palette.setAttribute('role', 'group');
+  palette.setAttribute('aria-label', '영상 위 자막·번역·한자 표시 옵션');
+  const heading = document.createElement('div');
+  heading.className = 'overlay-option-title';
+  const title = document.createElement('span');
+  title.textContent = '영상 표시 옵션';
+  const help = document.createElement('span');
+  help.textContent = 'Ctrl+Shift+휠: 크기';
+  heading.append(title, help);
+  palette.appendChild(heading);
+
+  const options = [
+    { key:'subtitle', label:'자막' },
+    { key:'translation', label:'번역' },
+    { key:'hanzi', label:'한자' },
+  ];
+  for (const option of options) {
+    const row = document.createElement('div');
+    row.className = 'overlay-option-row';
+    row.dataset.overlayOptionKey = option.key;
+    const name = document.createElement('span');
+    name.className = 'overlay-option-name';
+    name.textContent = option.label;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.id = `overlayOptionToggle-${option.key}`;
+    toggle.className = 'bfp-btn overlay-option-toggle';
+    toggle.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleOverlayForKey(option.key);
+      syncOverlayOptionPalette();
+    });
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.id = `overlayOptionSlider-${option.key}`;
+    slider.className = 'overlay-option-slider';
+    slider.min = '0.3'; slider.max = '3'; slider.step = '0.05';
+    slider.dataset.overlayOptionKey = option.key;
+    slider.setAttribute('aria-label', `${option.label} 글자 크기`);
+    slider.addEventListener('input', () => {
+      setOverlayScaleValueForKey(option.key, slider.value, false);
+      syncOverlayOptionPalette();
+      queueScaleSave();
+    });
+    slider.addEventListener('change', () => {
+      queueScaleSave(true);
+    });
+    const output = document.createElement('output');
+    output.id = `overlayOptionValue-${option.key}`;
+    output.className = 'overlay-option-value';
+    row.append(name, toggle, slider, output);
+    palette.appendChild(row);
+  }
+  container.appendChild(palette);
+  overlayOptionPaletteNode = palette;
+
+  const hint = document.createElement('div');
+  hint.id = 'overlayScaleHint';
+  hint.setAttribute('aria-live', 'off');
+  container.appendChild(hint);
+  overlayScaleHintNode = hint;
+  syncOverlayOptionPalette();
+}
+
+function placeOverlayFloatingElement(element, container, target, x, y, anchorToTarget) {
+  const box = container.getBoundingClientRect();
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
+  const inset = 8;
+  let left = anchorToTarget && target?.rect ? target.rect.right - box.left + 8 : x - box.left + 10;
+  let top = anchorToTarget && target?.rect ? target.rect.top - box.top : y - box.top + 10;
+  if (anchorToTarget && target?.rect && left + width > container.clientWidth - inset) {
+    left = target.rect.left - box.left - width - 8;
+  }
+  left = Math.max(inset, Math.min(left, Math.max(inset, container.clientWidth - width - inset)));
+  top = Math.max(inset, Math.min(top, Math.max(inset, container.clientHeight - height - inset)));
+  element.style.left = `${left}px`;
+  element.style.top = `${top}px`;
+}
+
 function updateOverlayShiftTarget(x, y) {
   if (Number.isFinite(x) && Number.isFinite(y)) overlayInteractionPointer = { x, y };
   const targets = [
@@ -10442,90 +10597,167 @@ function updateOverlayShiftTarget(x, y) {
     document.getElementById('transVideoOverlay'),
     document.getElementById('hanziVideoOverlay'),
   ];
-  targets.forEach(element => element?.classList.remove(overlayShiftTargetClass));
-  if (!overlayInteractionShiftHeld || !overlayInteractionPointer || audioOnlyMode) return;
-  const target = findOverlayTextTargetAt(overlayInteractionPointer.x, overlayInteractionPointer.y);
-  target?.element.classList.add(overlayShiftTargetClass);
+  targets.forEach(element => element?.classList.remove(overlayCtrlTargetClass));
+
+  const container = document.getElementById('videoContainer');
+  if (!overlayInteractionShiftHeld) overlayInteractionPointerOverPalette = false;
+  const hasPointer = !!(overlayInteractionPointer && container);
+  const target = hasPointer && !overlayInteractionPointerOverPalette &&
+    (overlayInteractionShiftHeld || overlayInteractionCtrlHeld) ?
+    findOverlayTextTargetAt(overlayInteractionPointer.x, overlayInteractionPointer.y) : null;
+  const shiftActive = overlayInteractionShiftHeld && hasPointer && !audioOnlyMode;
+  const ctrlActive = overlayInteractionCtrlHeld && !overlayInteractionShiftHeld && !!target;
+
+  if (ctrlActive && target) {
+    target.element.classList.add(overlayCtrlTargetClass);
+    if (overlayScaleHintNode && container) {
+      const label = target.key === 'subtitle' ? '자막' : target.key === 'translation' ? '번역' : '한자';
+      overlayScaleHintNode.textContent = `${label} ${Math.round(overlayScaleValueForKey(target.key) * 100)}% · Ctrl+휠`;
+      overlayScaleHintNode.style.display = 'block';
+      placeOverlayFloatingElement(overlayScaleHintNode, container, target, overlayInteractionPointer.x, overlayInteractionPointer.y, true);
+    }
+  } else if (overlayScaleHintNode) {
+    overlayScaleHintNode.style.display = 'none';
+  }
+
+  if (shiftActive && overlayOptionPaletteNode && container) {
+    if (overlayOptionPaletteNode.style.display !== 'block') {
+      syncOverlayOptionPalette();
+      overlayOptionPaletteNode.style.display = 'block';
+      placeOverlayFloatingElement(overlayOptionPaletteNode, container, target,
+        overlayInteractionPointer.x, overlayInteractionPointer.y, !!target);
+    }
+  } else if (overlayOptionPaletteNode) {
+    overlayOptionPaletteNode.style.display = 'none';
+  }
 }
+
 
 function installOverlayShiftInteraction() {
   const container = document.getElementById('videoContainer');
   if (!container || container.dataset.overlayShiftReady === '1') return;
   container.dataset.overlayShiftReady = '1';
 
+  const overlayScaleWheelRemainders = Object.create(null);
+  let overlayScaleSaveTimer = null;
+  const overlayScaleWheelThreshold = 80;
+  const queueScaleSave = flush => {
+    clearTimeout(overlayScaleSaveTimer);
+    overlayScaleSaveTimer = null;
+    if (flush) { try { saveSettings(); } catch (_) {} return; }
+    overlayScaleSaveTimer = setTimeout(() => {
+      overlayScaleSaveTimer = null;
+      try { saveSettings(); } catch (_) {}
+    }, 300);
+  };
+  ensureOverlayModifierControls(container, queueScaleSave);
+
+  let modifierPointerFrame = 0;
+  let modifierPointerPending = null;
   container.addEventListener('pointermove', event => {
     if (event.pointerType === 'touch') return;
-    updateOverlayShiftTarget(event.clientX, event.clientY);
+    overlayInteractionPointerOverPalette = !!overlayOptionPaletteNode?.contains(event.target);
+    if (overlayInteractionPointerOverPalette) {
+      modifierPointerPending = null;
+      if (modifierPointerFrame) cancelAnimationFrame(modifierPointerFrame);
+      modifierPointerFrame = 0;
+      updateOverlayShiftTarget();
+      return;
+    }
+    modifierPointerPending = { x:event.clientX, y:event.clientY };
+    if (modifierPointerFrame) return;
+    modifierPointerFrame = requestAnimationFrame(() => {
+      modifierPointerFrame = 0;
+      const point = modifierPointerPending;
+      modifierPointerPending = null;
+      if (point) updateOverlayShiftTarget(point.x, point.y);
+    });
   }, { passive:true });
   container.addEventListener('pointerleave', () => {
     overlayInteractionPointer = null;
+    overlayInteractionPointerOverPalette = false;
+    modifierPointerPending = null;
+    if (modifierPointerFrame) cancelAnimationFrame(modifierPointerFrame);
+    modifierPointerFrame = 0;
     updateOverlayShiftTarget();
   });
 
-  const overlayScaleWheelRemainders = Object.create(null);
-  let overlayScaleWheelSaveTimer = null;
-  const overlayScaleWheelThreshold = 80;
-  container.addEventListener('wheel', event => {
-    if (!event.shiftKey || !event.deltaY || audioOnlyMode) return;
-    const target = findOverlayTextTargetAt(event.clientX, event.clientY);
-    if (!target) return;
-
-    // 글자 위 Shift+휠만 소비하고, 일반 휠/빈 영상 영역은 기존 동작에 맡긴다.
-    event.preventDefault();
-    event.stopPropagation();
+  const applyWheelScale = (key, event, mode) => {
     const deltaY = event.deltaMode === 1 ? event.deltaY * (overlayScaleWheelThreshold / 3) :
       (event.deltaMode === 2 ? event.deltaY * overlayScaleWheelThreshold : event.deltaY);
     if (!Number.isFinite(deltaY) || !deltaY) return;
-
-    const previous = overlayScaleWheelRemainders[target.key] || 0;
+    const bucket = `${mode}:${key}`;
+    const previous = overlayScaleWheelRemainders[bucket] || 0;
     const accumulated = previous && Math.sign(previous) !== Math.sign(deltaY) ? deltaY : previous + deltaY;
     const steps = Math.trunc(accumulated / overlayScaleWheelThreshold);
-    overlayScaleWheelRemainders[target.key] = accumulated - steps * overlayScaleWheelThreshold;
+    overlayScaleWheelRemainders[bucket] = accumulated - steps * overlayScaleWheelThreshold;
     if (!steps) return;
-
-    let current;
-    let applyScale;
-    if (target.key === 'subtitle') { current = subOverlayScale; applyScale = setSubOverlayScaleFromSlider; }
-    else if (target.key === 'translation') { current = transOverlayScale; applyScale = setTransOverlayScaleFromSlider; }
-    else { current = hanziOverlayScale; applyScale = setHanziOverlayScaleFromSlider; }
+    const current = overlayScaleValueForKey(key);
     const next = normalizeOverlayScale(current - steps * 0.05);
     if (next === null || next === current) return;
-    applyScale(next, false);
+    setOverlayScaleValueForKey(key, next, false);
+    syncOverlayOptionPalette();
+    updateOverlayShiftTarget(event.clientX, event.clientY);
+    queueScaleSave(false);
+  };
 
-    clearTimeout(overlayScaleWheelSaveTimer);
-    overlayScaleWheelSaveTimer = setTimeout(() => {
-      overlayScaleWheelSaveTimer = null;
-      try { saveSettings(); } catch (_) {}
-    }, 300);
+  container.addEventListener('wheel', event => {
+    if (!event.deltaY || audioOnlyMode) return;
+    const overPalette = !!overlayOptionPaletteNode?.contains(event.target);
+    const eventElement = event.target instanceof Element ? event.target : null;
+
+    if (event.ctrlKey && event.shiftKey) {
+      const row = eventElement?.closest('[data-overlay-option-key]');
+      const key = overPalette ? row?.dataset.overlayOptionKey : findOverlayTextTargetAt(event.clientX, event.clientY)?.key;
+      event.preventDefault();
+      event.stopPropagation();
+      if (key) applyWheelScale(key, event, 'ctrlShift');
+      return;
+    }
+    if (event.shiftKey) {
+      // Shift만 누른 휠은 옵션 패널을 유지하고 값/전역 음량은 바꾸지 않는다.
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!event.ctrlKey) return;
+    const target = findOverlayTextTargetAt(event.clientX, event.clientY);
+    if (!target) return;
+    event.preventDefault();
+    event.stopPropagation();
+    applyWheelScale(target.key, event, 'ctrl');
   }, { passive:false, capture:true });
 
-  const handleShift = event => {
-    if (event.key !== 'Shift') return;
-    overlayInteractionShiftHeld = event.type === 'keydown';
+  const handleModifier = event => {
+    const down = event.type === 'keydown';
+    if (event.key === 'Shift' || event.code === 'ShiftLeft' || event.code === 'ShiftRight') overlayInteractionShiftHeld = down;
+    else if (event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight') overlayInteractionCtrlHeld = down;
+    else return;
     updateOverlayShiftTarget();
   };
-  window.addEventListener('keydown', handleShift, true);
-  window.addEventListener('keyup', handleShift, true);
+  window.addEventListener('keydown', handleModifier, true);
+  window.addEventListener('keyup', handleModifier, true);
   window.addEventListener('blur', () => {
     overlayInteractionShiftHeld = false;
+    overlayInteractionCtrlHeld = false;
     updateOverlayShiftTarget();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       overlayInteractionShiftHeld = false;
+      overlayInteractionCtrlHeld = false;
       updateOverlayShiftTarget();
     }
   });
 
   container.addEventListener('click', event => {
     if ((!event.shiftKey && !overlayInteractionShiftHeld) || audioOnlyMode) return;
+    if (overlayOptionPaletteNode?.contains(event.target)) return;
     const target = findOverlayTextTargetAt(event.clientX, event.clientY);
     if (!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (target.key === 'subtitle') toggleSubOverlay();
-    else if (target.key === 'translation') toggleTransVideoOverlay();
-    else if (target.key === 'hanzi') toggleHanziVideoOverlay();
+    toggleOverlayForKey(target.key);
     updateOverlayShiftTarget(event.clientX, event.clientY);
   }, true);
 
@@ -10534,6 +10766,7 @@ function installOverlayShiftInteraction() {
     const message = event.data;
     if (!message || message.llt !== 'vp-overlay-shift-state') return;
     overlayInteractionShiftHeld = message.down === true;
+    overlayInteractionCtrlHeld = message.ctrlDown === true;
     updateOverlayShiftTarget();
   });
   updateOverlayShiftTarget();
@@ -10548,6 +10781,7 @@ function toggleTransVideoOverlay() {
   transVideoOverlayEnabled = !transVideoOverlayEnabled;
   document.getElementById('transVideoOverlay').classList.toggle('active', transVideoOverlayEnabled);
   updateOverlayShiftTarget();
+  syncOverlayOptionPalette();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
 }
@@ -10556,6 +10790,7 @@ function toggleHanziVideoOverlay() {
   hanziVideoOverlayEnabled = !hanziVideoOverlayEnabled;
   document.getElementById('hanziVideoOverlay').classList.toggle('active', hanziVideoOverlayEnabled);
   updateOverlayShiftTarget();
+  syncOverlayOptionPalette();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
 }
@@ -10579,18 +10814,21 @@ function setSubOverlayScaleFromSlider(value, persist = true) {
   const scale = normalizeOverlayScale(value); if (scale === null) return;
   subOverlayScale = scale;
   syncOverlayScaleControl(scale, '--sub-overlay-scale', 'subOverlayScaleSlider', 'subOverlayScaleValue');
+  syncOverlayOptionPalette();
   if (persist) { try { saveSettings(); } catch (_) {} }
 }
 function setTransOverlayScaleFromSlider(value, persist = true) {
   const scale = normalizeOverlayScale(value); if (scale === null) return;
   transOverlayScale = scale;
   syncOverlayScaleControl(scale, '--trans-overlay-scale', 'transOverlayScaleSlider', 'transOverlayScaleValue');
+  syncOverlayOptionPalette();
   if (persist) { try { saveSettings(); } catch (_) {} }
 }
 function setHanziOverlayScaleFromSlider(value, persist = true) {
   const scale = normalizeOverlayScale(value); if (scale === null) return;
   hanziOverlayScale = scale;
   syncOverlayScaleControl(scale, '--hanzi-overlay-scale', 'hanziOverlayScaleSlider', 'hanziOverlayScaleValue');
+  syncOverlayOptionPalette();
   if (persist) { try { saveSettings(); } catch (_) {} }
 }
 // ===== 영상 위 자막 오버레이 =====
@@ -10614,6 +10852,7 @@ function toggleSubOverlay() {
     document.getElementById('resizeTimelineDisplay').style.display = '';
   }
   updateOverlayShiftTarget();
+  syncOverlayOptionPalette();
   updateTopFloatUI();
   updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
