@@ -2985,10 +2985,10 @@ window.addEventListener('message', e => {
       // 한 번 더 조회하고, 보관 핸들이 0개면 권한 문제가 아닌 연결 없음으로 확정한다.
       if (_playlistHasCheckingItems()) {
         if (playlistHostHasHandles) {
-          if (!playlistHostSnapshotPending) _requestHostedAccessSnapshot(currentIndex, false);
+          if (!playlistHostSnapshotPending) _requestHostedAccessSnapshot(currentIndex, true);
         } else if (_playlistAccessEntries().length) {
           _registerPlaylistAccessHandlesWithHost();
-          _requestHostedAccessSnapshot(currentIndex, false);
+          _requestHostedAccessSnapshot(currentIndex, true);
         }
         else void _finalizePlaylistWithoutHostedHandles(false);
       } else {
@@ -3098,6 +3098,12 @@ function _vpRestoreResumeAudioOnGesture() {
 // Window capture runs before document handlers that may stop propagation.
 for (const type of _vpResumeAudioGestureEvents)
   window.addEventListener(type, _vpRestoreResumeAudioOnGesture, true);
+function _vpStartMutedPlayback() {
+  const wasMuted = !!video.muted;
+  video.muted = true;
+  _vpResumeAudioPending = !wasMuted;
+  return video.play();
+}
 function _vpApplyLocalResume() {
   if (_vpResumed) return false;
   try {
@@ -7385,7 +7391,7 @@ async function _applyBrokeredPlaylistFiles(payload) {
   const target = playlist[targetIndex];
   if (target && _playlistItemPlayable(target)) {
     const loaded = loadVideo(targetIndex, true);
-    if (loaded !== false && payload.autoPlay !== false) video.play().catch(() => {});
+    if (loaded !== false && payload.autoPlay !== false) _vpStartMutedPlayback().catch(() => {});
   }
 
   const excluded = Math.max(Number(payload.missingVideos) || 0, oldPlaylist.length - kept.length);
@@ -7646,7 +7652,7 @@ async function _applyGrantedPlaylistRoot(root, playIndex = currentIndex, autoPla
   const target = playlist[targetIndex];
   if (target && _playlistItemPlayable(target)) {
     const loaded = loadVideo(targetIndex, true);
-    if (loaded !== false && autoPlay) video.play().catch(() => {});
+    if (loaded !== false && autoPlay) _vpStartMutedPlayback().catch(() => {});
   }
 
   const detail = [
@@ -7850,7 +7856,7 @@ async function _applyHostedAccessFiles(payload = {}) {
   const target = playlist[targetIndex];
   if (target && _playlistItemPlayable(target)) {
     const loaded = loadVideo(targetIndex, true);
-    if (loaded !== false && payload.autoPlay !== false) video.play().catch(() => {});
+    if (loaded !== false && payload.autoPlay !== false) _vpStartMutedPlayback().catch(() => {});
   }
   _updatePlaylistPermissionUI();
   if (permissionCount === 0 && relinkCount === 0 && playlist.length) {
@@ -7922,7 +7928,7 @@ async function _reloadSavedPlaylistHandles(playIndex = currentIndex, autoPlay = 
   const target = playlist[targetIndex];
   if (target && _playlistItemPlayable(target)) {
     const loaded = loadVideo(targetIndex, true);
-    if (loaded !== false && autoPlay) video.play().catch(() => {});
+    if (loaded !== false && autoPlay) _vpStartMutedPlayback().catch(() => {});
   }
   _updatePlaylistPermissionUI();
   if (permissionCount === 0 && relinkCount === 0) {
@@ -9814,10 +9820,9 @@ async function _restorePlaylistFromDB() {
     console.log('[IDB] 저장된 항목 수:', items.length);
     if (!items.length) return;
 
-    const [savedIdx, savedTime, savedWasPlaying, savedRootHandle] = await Promise.all([
+    const [savedIdx, savedTime, savedRootHandle] = await Promise.all([
       _getPlaylistMeta('currentIndex'),
       _getPlaylistMeta('currentTime'),
-      _getPlaylistMeta('wasPlaying'),
       _getPlaylistMeta('playlistRootHandle')
     ]);
     playlistRootHandle = savedRootHandle || null;
@@ -9905,10 +9910,7 @@ async function _restorePlaylistFromDB() {
     // 저장된 위치로 seek + 자동 재생: mute → play, 첫 사용자 입력 시 unmute (Chrome 정책상 unmute 는 user gesture 필요)
     const resumeOnce = () => {
       _vpApplyIndexedDbResumeTime(savedTime);
-      const wasMuted = video.muted;
-      video.muted = true;
-      _vpResumeAudioPending = !wasMuted;
-      video.play().catch(() => {});
+      _vpStartMutedPlayback().catch(() => {});
     };
     video.addEventListener('loadedmetadata', resumeOnce, { once: true });
     // 목록의 다른 영상이나 SRT가 잠겨 있어도 현재 영상이 복원돼 있으면 즉시 재생한다.
@@ -9932,10 +9934,10 @@ async function _restorePlaylistFromDB() {
       const pending = playlistPendingHostAccessResult;
       playlistPendingHostAccessResult = null;
       await _finishHostedPlaylistPermissionRequest({
-        ...pending, playIndex:ri, autoPlay:savedWasPlaying !== false
+        ...pending, playIndex:ri, autoPlay:true
       });
     } else if (restored.some(item => item.hostAccess)) {
-      _requestHostedAccessSnapshot(ri, savedWasPlaying !== false);
+      _requestHostedAccessSnapshot(ri, true);
     }
   } catch(e) { console.warn('[IDB] 복원 실패', e); }
 }
