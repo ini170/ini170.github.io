@@ -672,6 +672,22 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .bfp-btn.danger { background: #3a1010; border-color: #c62828; color: #ff8a80; }
 .bfp-preset { background: #0d2a0d; border-color: #388e3c; color: #81c784; }
 .bfp-preset:hover { background: #1a4a1a; }
+.overlay-scale-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 5px; }
+.overlay-scale-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.overlay-scale-card .bfp-btn { width: 100%; }
+.overlay-scale-meta { display: flex; align-items: center; justify-content: space-between; gap: 5px; color: #aaa; font-size: 10px; }
+.overlay-scale-value { min-width: 42px; padding: 2px 6px; border: 1px solid #344b59; border-radius: 4px; background: #14212a; color: #81d4fa; font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.overlay-scale-slider { display: block; width: 100%; min-width: 0; height: 30px; margin: 0; accent-color: #4fc3f7; cursor: pointer; touch-action: pan-y; }
+.overlay-scale-slider:focus-visible { outline: 2px solid #4fc3f7; outline-offset: 1px; }
+.overlay-scale-range { display: flex; justify-content: space-between; gap: 4px; color: #777; font-size: 9px; line-height: 1.2; white-space: nowrap; }
+@media (max-width: 420px) {
+  .overlay-scale-controls { grid-template-columns: 1fr; gap: 8px; }
+  .overlay-scale-card { padding-bottom: 5px; border-bottom: 1px solid #292938; }
+  .overlay-scale-slider { height: 36px; }
+}
+@media (pointer: coarse) {
+  .overlay-scale-slider { height: 40px; }
+}
 
 /* ===== 우하단 단축키 패널 ===== */
 #shortcutPanel {
@@ -1432,34 +1448,37 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         <button class="bfp-btn" id="bf-side"     onclick="toggleSidePanel();updateBottomFloatUI()">📋 사이드</button>
         <button class="bfp-btn" id="bf-audio-only" onclick="toggleAudioOnly()">🔊 오디오전용</button>
       </div>
-      <!-- 2행: 영상 위 오버레이 3구획 (자막·번역·한자) + 각 구획 하단 크기 수치 (세로 정렬) -->
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-top:5px;">
+      <!-- 2행: 영상 위 자막·번역·한자 표시와 방향을 확인할 수 있는 개별 크기 슬라이더 -->
+      <div class="overlay-scale-controls">
         <!-- 자막 영상위 -->
-        <div style="display:flex; flex-direction:column; gap:3px;">
+        <div class="overlay-scale-card">
           <button class="bfp-btn" id="bf-subov" onclick="toggleSubOverlay();updateBottomFloatUI()" style="width:100%;">🎬 자막영상위</button>
-          <div style="display:flex; align-items:center; justify-content:center; gap:4px; font-size:10px; color:#888;">
+          <div class="overlay-scale-meta">
             <span>크기</span>
-            <span class="drag-num" id="subOverlayScaleDrag" data-val="1.0" data-min="0.3" data-max="3.0" data-step="0.05" data-decimals="2" data-scale="0.013" data-cb="setSubOverlayScaleFromDrag"
-              style="color:#4fc3f7; cursor:ew-resize; padding:1px 6px; background:#222; border-radius:2px; border:1px solid #333; user-select:none; min-width:32px; text-align:center;">1.00</span>
+            <output class="overlay-scale-value" id="subOverlayScaleValue">100%</output>
           </div>
+          <input class="overlay-scale-slider" id="subOverlayScaleSlider" type="range" min="0.3" max="3" step="0.05" value="1" aria-label="자막 영상 위 글자 크기" oninput="setSubOverlayScaleFromSlider(this.value, false)" onchange="setSubOverlayScaleFromSlider(this.value, true)">
+          <div class="overlay-scale-range"><span>작게 · 30%</span><span>크게 · 300%</span></div>
         </div>
         <!-- 번역 영상위 -->
-        <div style="display:flex; flex-direction:column; gap:3px;">
+        <div class="overlay-scale-card">
           <button class="bfp-btn" id="bf-trans-ov" onclick="toggleTransVideoOverlay();updateBottomFloatUI()" style="width:100%;">🌐 번역영상위</button>
-          <div style="display:flex; align-items:center; justify-content:center; gap:4px; font-size:10px; color:#888;">
+          <div class="overlay-scale-meta">
             <span>크기</span>
-            <span class="drag-num" id="transOverlayScaleDrag" data-val="1.0" data-min="0.3" data-max="3.0" data-step="0.05" data-decimals="2" data-scale="0.013" data-cb="setTransOverlayScaleFromDrag"
-              style="color:#4fc3f7; cursor:ew-resize; padding:1px 6px; background:#222; border-radius:2px; border:1px solid #333; user-select:none; min-width:32px; text-align:center;">1.00</span>
+            <output class="overlay-scale-value" id="transOverlayScaleValue">100%</output>
           </div>
+          <input class="overlay-scale-slider" id="transOverlayScaleSlider" type="range" min="0.3" max="3" step="0.05" value="1" aria-label="번역 영상 위 글자 크기" oninput="setTransOverlayScaleFromSlider(this.value, false)" onchange="setTransOverlayScaleFromSlider(this.value, true)">
+          <div class="overlay-scale-range"><span>작게 · 30%</span><span>크게 · 300%</span></div>
         </div>
         <!-- 한자 영상위 -->
-        <div style="display:flex; flex-direction:column; gap:3px;">
+        <div class="overlay-scale-card">
           <button class="bfp-btn" id="bf-hanzi-ov" onclick="toggleHanziVideoOverlay();updateBottomFloatUI()" style="width:100%;">📖 한자영상위</button>
-          <div style="display:flex; align-items:center; justify-content:center; gap:4px; font-size:10px; color:#888;">
+          <div class="overlay-scale-meta">
             <span>크기</span>
-            <span class="drag-num" id="hanziOverlayScaleDrag" data-val="1.0" data-min="0.3" data-max="3.0" data-step="0.05" data-decimals="2" data-scale="0.013" data-cb="setHanziOverlayScaleFromDrag"
-              style="color:#4fc3f7; cursor:ew-resize; padding:1px 6px; background:#222; border-radius:2px; border:1px solid #333; user-select:none; min-width:32px; text-align:center;">1.00</span>
+            <output class="overlay-scale-value" id="hanziOverlayScaleValue">100%</output>
           </div>
+          <input class="overlay-scale-slider" id="hanziOverlayScaleSlider" type="range" min="0.3" max="3" step="0.05" value="1" aria-label="한자 영상 위 글자 크기" oninput="setHanziOverlayScaleFromSlider(this.value, false)" onchange="setHanziOverlayScaleFromSlider(this.value, true)">
+          <div class="overlay-scale-range"><span>작게 · 30%</span><span>크게 · 300%</span></div>
         </div>
       </div>
     </div>
@@ -7247,9 +7266,9 @@ function applyPendingLayout() {
   }
   if (Number.isFinite(L.translationPanelScale) && L.translationPanelScale > 0) setTranslationPanelScale(L.translationPanelScale, false);
   if (Number.isFinite(L.charDictPanelScale) && L.charDictPanelScale > 0) setCharDictPanelScale(L.charDictPanelScale, false);
-  if (Number.isFinite(L.subOverlayScale)   && L.subOverlayScale > 0)   setSubOverlayScaleFromDrag(L.subOverlayScale);
-  if (Number.isFinite(L.transOverlayScale) && L.transOverlayScale > 0) setTransOverlayScaleFromDrag(L.transOverlayScale);
-  if (Number.isFinite(L.hanziOverlayScale) && L.hanziOverlayScale > 0) setHanziOverlayScaleFromDrag(L.hanziOverlayScale);
+  if (Number.isFinite(L.subOverlayScale)   && L.subOverlayScale > 0)   setSubOverlayScaleFromSlider(L.subOverlayScale, false);
+  if (Number.isFinite(L.transOverlayScale) && L.transOverlayScale > 0) setTransOverlayScaleFromSlider(L.transOverlayScale, false);
+  if (Number.isFinite(L.hanziOverlayScale) && L.hanziOverlayScale > 0) setHanziOverlayScaleFromSlider(L.hanziOverlayScale, false);
   _pendingLayout = null;
 }
 
@@ -10507,31 +10526,36 @@ function toggleHanziVideoOverlay() {
 // ===== 영상 위 오버레이 크기 (자막/번역/한자) 개별 스케일 =====
 // CSS 변수(--sub-overlay-scale, --trans-overlay-scale, --hanzi-overlay-scale)로 transform: scale() 적용
 let subOverlayScale = 1.0, transOverlayScale = 1.0, hanziOverlayScale = 1.0;
-function setSubOverlayScaleFromDrag(v) {
-  v = parseFloat(v); if (isNaN(v) || v <= 0) return;
-  subOverlayScale = v;
-  document.documentElement.style.setProperty('--sub-overlay-scale', v);
-  const el = document.getElementById('subOverlayScaleDrag');
-  if (el) { el.dataset.val = v; el.textContent = v.toFixed(2); }
-  try { saveSettings(); } catch(_) {}
+function normalizeOverlayScale(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.round(Math.max(0.3, Math.min(3.0, number)) * 20) / 20;
 }
-function setTransOverlayScaleFromDrag(v) {
-  v = parseFloat(v); if (isNaN(v) || v <= 0) return;
-  transOverlayScale = v;
-  document.documentElement.style.setProperty('--trans-overlay-scale', v);
-  const el = document.getElementById('transOverlayScaleDrag');
-  if (el) { el.dataset.val = v; el.textContent = v.toFixed(2); }
-  try { saveSettings(); } catch(_) {}
+function syncOverlayScaleControl(value, cssVariable, sliderId, outputId) {
+  document.documentElement.style.setProperty(cssVariable, String(value));
+  const slider = document.getElementById(sliderId);
+  if (slider) slider.value = String(value);
+  const output = document.getElementById(outputId);
+  if (output) output.textContent = `${Math.round(value * 100)}%`;
 }
-function setHanziOverlayScaleFromDrag(v) {
-  v = parseFloat(v); if (isNaN(v) || v <= 0) return;
-  hanziOverlayScale = v;
-  document.documentElement.style.setProperty('--hanzi-overlay-scale', v);
-  const el = document.getElementById('hanziOverlayScaleDrag');
-  if (el) { el.dataset.val = v; el.textContent = v.toFixed(2); }
-  try { saveSettings(); } catch(_) {}
+function setSubOverlayScaleFromSlider(value, persist = true) {
+  const scale = normalizeOverlayScale(value); if (scale === null) return;
+  subOverlayScale = scale;
+  syncOverlayScaleControl(scale, '--sub-overlay-scale', 'subOverlayScaleSlider', 'subOverlayScaleValue');
+  if (persist) { try { saveSettings(); } catch (_) {} }
 }
-
+function setTransOverlayScaleFromSlider(value, persist = true) {
+  const scale = normalizeOverlayScale(value); if (scale === null) return;
+  transOverlayScale = scale;
+  syncOverlayScaleControl(scale, '--trans-overlay-scale', 'transOverlayScaleSlider', 'transOverlayScaleValue');
+  if (persist) { try { saveSettings(); } catch (_) {} }
+}
+function setHanziOverlayScaleFromSlider(value, persist = true) {
+  const scale = normalizeOverlayScale(value); if (scale === null) return;
+  hanziOverlayScale = scale;
+  syncOverlayScaleControl(scale, '--hanzi-overlay-scale', 'hanziOverlayScaleSlider', 'hanziOverlayScaleValue');
+  if (persist) { try { saveSettings(); } catch (_) {} }
+}
 // ===== 영상 위 자막 오버레이 =====
 let subOverlayMode = false;
 function toggleSubOverlay() {
