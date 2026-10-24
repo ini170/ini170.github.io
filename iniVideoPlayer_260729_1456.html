@@ -1928,95 +1928,107 @@ function initResizers() {
 
 function makeResizable(resizer, direction) {
   let isResizing = false;
-  let didMove = false; // 실제 드래그 여부 (클릭과 구분)
-  let startX, startY, startWidth, startHeight;
-  const DRAG_THRESHOLD = 5; // 이 픽셀 이상 움직여야 resize 시작
+  let didMove = false;
+  let activePointerId = null;
+  let startX = 0, startY = 0, startWidth = 0, startHeight = 0;
+  let resizeTarget = null;
+  let previousCursor = '';
+  let previousUserSelect = '';
+  const DRAG_THRESHOLD = 5;
 
-  // 포인터 좌표 추출 (마우스/터치 공통)
-  const getXY = (e) => e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
-                                  : { x: e.clientX,           y: e.clientY };
+  const finish = (event) => {
+    if (!isResizing) return;
+    if (event?.pointerId != null && activePointerId != null && event.pointerId !== activePointerId) return;
+    const pointerId = activePointerId;
+    isResizing = false;
+    activePointerId = null;
+    resizeTarget = null;
+    document.body.style.cursor = previousCursor;
+    document.body.style.userSelect = previousUserSelect;
+    document.removeEventListener('pointermove', onMove, true);
+    document.removeEventListener('pointerup', onEnd, true);
+    document.removeEventListener('pointercancel', onEnd, true);
+    document.removeEventListener('visibilitychange', onVisibilityChange, true);
+    window.removeEventListener('blur', onWindowBlur, true);
+    resizer.removeEventListener('lostpointercapture', onLostPointerCapture);
+    try {
+      if (pointerId != null && resizer.hasPointerCapture(pointerId)) resizer.releasePointerCapture(pointerId);
+    } catch (_) {}
+    if (didMove) { try { saveSettings(); } catch (_) {} }
+  };
 
-  const onStart = (e) => {
-    const { x, y } = getXY(e);
-    startX = x; startY = y;
-    didMove = false;
-
+  const onMove = (event) => {
+    if (!isResizing || event.pointerId !== activePointerId || !resizeTarget) return;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    const delta = direction === 'horizontal' ? deltaX : deltaY;
+    if (!didMove && Math.abs(delta) < DRAG_THRESHOLD) return;
+    didMove = true;
+    if (event.cancelable) event.preventDefault();
     if (direction === 'horizontal') {
-      const leftPanel = document.getElementById('leftPanel');
-      startWidth = leftPanel.offsetWidth;
-
-      const onMove = (e) => {
-        const { x } = getXY(e);
-        const deltaX = x - startX;
-        if (!didMove && Math.abs(deltaX) < DRAG_THRESHOLD) return;
-        didMove = true;
-        if (e.cancelable) e.preventDefault();
-        document.body.style.cursor = 'ew-resize';
-        const newWidth = startWidth + deltaX;
-        const containerWidth = document.getElementById('mainContainer').offsetWidth;
-        const minRightPanelWidth = 180;
-        if (newWidth > containerWidth - 50) {
-          if (sidePanelVisible) toggleSidePanel();
-          return;
-        }
-        if (newWidth > 200 && newWidth < containerWidth - minRightPanelWidth - 8)
-          leftPanel.style.flex = `0 0 ${newWidth}px`;
-      };
-      const onEnd = () => {
-        isResizing = false;
-        document.body.style.cursor = 'default';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup',   onEnd);
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('touchend',  onEnd);
-        if (didMove) { try { saveSettings(); } catch(_) {} }
-      };
-      document.addEventListener('mousemove', onMove, { passive: false });
-      document.addEventListener('mouseup',   onEnd);
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('touchend',  onEnd);
-
-    } else if (direction === 'vertical') {
-      let prevElement = resizer.previousElementSibling;
-      while (prevElement && prevElement.offsetHeight === 0) {
-        prevElement = prevElement.previousElementSibling;
+      document.body.style.cursor = 'ew-resize';
+      const newWidth = startWidth + deltaX;
+      const mainContainer = document.getElementById('mainContainer');
+      const containerWidth = mainContainer ? mainContainer.offsetWidth : document.documentElement.clientWidth;
+      const minRightPanelWidth = 180;
+      if (newWidth > containerWidth - 50) {
+        if (sidePanelVisible) toggleSidePanel();
+        return;
       }
-      if (!prevElement) prevElement = resizer.parentElement.children[0];
-      startHeight = prevElement.offsetHeight;
-
-      const onMove = (e) => {
-        const { y } = getXY(e);
-        const deltaY = y - startY;
-        if (!didMove && Math.abs(deltaY) < DRAG_THRESHOLD) return;
-        didMove = true;
-        if (e.cancelable) e.preventDefault();
-        document.body.style.cursor = 'ns-resize';
-        const newHeight = startHeight + deltaY;
-        if (newHeight > 50) {
-          prevElement.style.flex = `0 0 ${newHeight}px`;
-          prevElement.style.minHeight = 'none';
-        }
-      };
-      const onEnd = () => {
-        isResizing = false;
-        document.body.style.cursor = 'default';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup',   onEnd);
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('touchend',  onEnd);
-        if (didMove) { try { saveSettings(); } catch(_) {} }
-      };
-      document.addEventListener('mousemove', onMove, { passive: false });
-      document.addEventListener('mouseup',   onEnd);
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('touchend',  onEnd);
+      if (newWidth > 200 && newWidth < containerWidth - minRightPanelWidth - 8)
+        resizeTarget.style.flex = `0 0 ${newWidth}px`;
+      return;
+    }
+    document.body.style.cursor = 'ns-resize';
+    const newHeight = startHeight + deltaY;
+    if (newHeight > 50) {
+      resizeTarget.style.flex = `0 0 ${newHeight}px`;
+      resizeTarget.style.minHeight = 'none';
     }
   };
 
-  resizer.addEventListener('mousedown', onStart);
-  resizer.addEventListener('touchstart', onStart, { passive: true });
-}
+  const onEnd = (event) => finish(event);
+  const onLostPointerCapture = (event) => finish(event);
+  const onWindowBlur = () => finish(null);
+  const onVisibilityChange = () => { if (document.hidden) finish(null); };
 
+  const onStart = (event) => {
+    if (isResizing || event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (direction === 'horizontal') {
+      resizeTarget = document.getElementById('leftPanel');
+      if (!resizeTarget) return;
+      startWidth = resizeTarget.offsetWidth;
+    } else {
+      resizeTarget = resizer.previousElementSibling;
+      while (resizeTarget && resizeTarget.offsetHeight === 0) resizeTarget = resizeTarget.previousElementSibling;
+      if (!resizeTarget) resizeTarget = resizer.parentElement?.children?.[0] || null;
+      if (!resizeTarget) return;
+      startHeight = resizeTarget.offsetHeight;
+    }
+
+    activePointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    didMove = false;
+    isResizing = true;
+    previousCursor = document.body.style.cursor;
+    previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+    if (event.cancelable) event.preventDefault();
+    try { resizer.setPointerCapture(activePointerId); } catch (_) {}
+
+    document.addEventListener('pointermove', onMove, { capture: true, passive: false });
+    document.addEventListener('pointerup', onEnd, true);
+    document.addEventListener('pointercancel', onEnd, true);
+    document.addEventListener('visibilitychange', onVisibilityChange, true);
+    window.addEventListener('blur', onWindowBlur, true);
+    resizer.addEventListener('lostpointercapture', onLostPointerCapture);
+  };
+
+  resizer.style.touchAction = 'none';
+  resizer.style.userSelect = 'none';
+  resizer.addEventListener('pointerdown', onStart);
+}
 // 페이지 로드 후 리사이져 초기화
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initResizers);
