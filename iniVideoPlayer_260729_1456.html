@@ -2870,7 +2870,9 @@ function renderPlaylist(){
     label.style.flex = '1';
     label.style.minWidth = '0';
     label.style.overflow = 'hidden';
-    label.style.textOverflow = 'ellipsis';
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.gap = '7px';
     label.style.whiteSpace = 'nowrap';
     // 저장 핸들의 권한과 실제 파일 존재 여부는 별개다. granted 핸들의 getFile()
     // 결과까지 확인한 뒤 준비/권한 필요/파일 없음·이동/연결 없음으로 구분한다.
@@ -2889,11 +2891,39 @@ function renderPlaylist(){
         : (itemState === 'missing' ? '❌ '
           : (itemState === 'unlinked' ? '⚠ ' : '… ')));
     const displayName = p.video?.name || p.placeholderVideoName || '(이름없음)';
-    label.textContent = `${itemPrefix}${displayName}`;
-    label.title = itemState === 'ready' ? '영상·자막 파일 존재 확인 완료 · Ctrl+Enter: 연결 위치 열기 · Ctrl+C: 선택 행 우선, 선택 없으면 마우스 위치 행의 상위 경로 복사'
+    const videoPath = String(p.videoPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const sourceRootName = String(p.sourceRootName || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const pathAlreadyHasRoot = !!(sourceRootName && videoPath.split('/')[0]?.toLocaleLowerCase() === sourceRootName.toLocaleLowerCase());
+    const relativeVideoPath = pathAlreadyHasRoot ? videoPath.split('/').slice(1).join('/') : videoPath;
+    const videoPathIsAbsolute = /^[a-z]:\//i.test(videoPath) || videoPath.startsWith('/');
+    const hasRelativeLocation = !!(videoPath && (videoPath.includes('/') || sourceRootName));
+    const locationLabel = hasRelativeLocation
+      ? (videoPathIsAbsolute ? videoPath : [sourceRootName, relativeVideoPath].filter(Boolean).join('/'))
+      : ((p.videoHandle || (p.hostAccess && p.accessId))
+        ? '브라우저 저장 연결'
+        : '실제 위치 미저장');
+    const nameLabel = document.createElement('span');
+    nameLabel.textContent = `${itemPrefix}${displayName}`;
+    nameLabel.style.cssText = 'flex:0 1 68%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    const locationEl = document.createElement('span');
+    locationEl.textContent = `📁 ${locationLabel}`;
+    locationEl.style.cssText = `flex:1 1 32%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:${hasRelativeLocation ? '.68' : '.48'};font-size:.78em;`;
+    label.append(nameLabel, locationEl);
+    const fullLocation = hasRelativeLocation
+      ? locationLabel
+      : ((p.videoHandle || (p.hostAccess && p.accessId))
+        ? '브라우저 프로필에 저장된 파일 연결 (OS 전체 경로 문자열은 공개되지 않음)'
+        : '저장된 실제 위치 없음');
+    const stateTitle = itemState === 'ready' ? '영상·자막 파일 존재 확인 완료'
       : (itemState === 'locked' ? '저장된 파일의 읽기 권한이 필요합니다'
         : (itemState === 'missing' ? _playlistItemMissingMessage(p)
           : (itemState === 'unlinked' ? '목록은 남아 있지만 실제 파일 연결 정보가 없습니다' : '저장된 파일을 확인하는 중입니다')));
+    const srtPath = String(p.srtPath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    const srtAlreadyHasRoot = !!(sourceRootName && srtPath.split('/')[0]?.toLocaleLowerCase() === sourceRootName.toLocaleLowerCase());
+    const relativeSrtPath = srtAlreadyHasRoot ? srtPath.split('/').slice(1).join('/') : srtPath;
+    const srtPathIsAbsolute = /^[a-z]:\//i.test(srtPath) || srtPath.startsWith('/');
+    const srtLocation = srtPath ? ` · SRT: ${srtPathIsAbsolute ? srtPath : [sourceRootName, relativeSrtPath].filter(Boolean).join('/')}` : '';
+    label.title = `영상 위치: ${fullLocation}${srtLocation}\n${stateTitle} · Ctrl+Enter: 연결 위치 열기 · Ctrl+C: 상위 경로 복사`;
     label.dataset.videoStatus = videoStatus;
     label.dataset.srtStatus = srtStatus;
     label.dataset.itemState = itemState;
