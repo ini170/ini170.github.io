@@ -109,69 +109,71 @@ video {
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
-  width: 52px;
+  width: var(--vp-char-card-width, 52px);
   background: #0d180d;
   border: 1px solid #2a4a2a;
   border-radius: 4px;
-  padding: 3px 2px;
+  padding: var(--vp-char-card-pad-y, 3px) var(--vp-char-card-pad-x, 2px);
   cursor: pointer;
   transition: border-color 0.15s;
 }
 .char-card:hover { border-color: #6aaa6a; }
 .char-card .cc-pinyin {
-  font-size: 9px;
+  font-size: var(--vp-char-pinyin-size, 9px);
   color: #7aba7a;
   line-height: 1.3;
   text-align: center;
-  min-height: 12px;
+  min-height: var(--vp-char-pinyin-min-height, 12px);
   word-break: break-all;
 }
 .char-card .cc-hanzi {
-  font-size: 26px;
+  font-size: var(--vp-char-hanzi-size, 26px);
   color: #e8ffe8;
   line-height: 1.1;
   text-align: center;
   text-shadow: 0 0 6px rgba(100,200,100,0.3);
 }
 .char-card .cc-meaning {
-  font-size: 8px;
+  font-size: var(--vp-char-meaning-size, 8px);
   color: #6a8a6a;
   line-height: 1.3;
   text-align: center;
   margin-top: 1px;
-  max-width: 50px;
+  max-width: var(--vp-char-meaning-max-width, 50px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .char-card-space {
   flex-shrink: 0;
-  width: 10px;
+  width: var(--vp-char-space-width, 10px);
   align-self: center;
   color: #333;
-  font-size: 14px;
+  font-size: var(--vp-char-space-size, 14px);
   text-align: center;
 }
 .char-card-space.char-card-literal {
   width: auto;
-  min-width: 12px;
+  min-width: var(--vp-char-literal-min-width, 12px);
   color: #e8ffe8;
-  font-size: 26px;
+  font-size: var(--vp-char-hanzi-size, 26px);
   line-height: 1.1;
   white-space: pre;
   text-shadow: 0 0 6px rgba(100,200,100,0.3);
 }
-.char-card-space.char-card-number { min-width: 26px; }
+.char-card-space.char-card-number { min-width: var(--vp-char-number-min-width, 26px); }
 .char-card-space.char-card-ellipsis {
-  min-width: 36px;
+  min-width: var(--vp-char-ellipsis-min-width, 36px);
 }
 .char-card-space.char-card-gap {
-  width: 10px;
-  min-width: 10px;
+  width: var(--vp-char-gap-width, 10px);
+  min-width: var(--vp-char-gap-width, 10px);
   color: transparent;
   font-size: 0;
   text-shadow: none;
 }
+
+.char-dict-empty { font-size: var(--vp-char-empty-size, 10px); }
 
 /* C232: 자막·번역·한자 패널의 복사 가능한 논리 줄.
    한자 카드는 세로 카드 DOM이지만 드래그 강조는 같은 병음/한자/뜻 줄에만 적용한다. */
@@ -848,6 +850,97 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   white-space: nowrap;
   max-width: 280px;
 }
+/* Double-click number editor: one horizontal, touch-friendly step control for every drag-num. */
+.drag-num-editor {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+  flex: 0 0 auto;
+  height: 36px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid #4fc3f7;
+  border-radius: 5px;
+  background: #111;
+  touch-action: manipulation;
+  position: relative;
+  z-index: 20;
+}
+.drag-num-editor .drag-num-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #292929;
+  color: #ddd;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.drag-num-editor .drag-num-step--down {
+  border-right: 1px solid #444;
+  color: #ffcc80;
+}
+.drag-num-editor .drag-num-step--up {
+  border-left: 1px solid #444;
+  color: #81d4fa;
+}
+.drag-num-editor .drag-num-step:hover { background: #3a3a3a; }
+.drag-num-editor .drag-num-step:active { background: #16465a; }
+.drag-num-editor .drag-num-step:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -3px;
+}
+.drag-num-editor input.drag-num-value {
+  flex: 0 0 54px;
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
+  height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: #111;
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  caret-color: auto;
+  touch-action: manipulation;
+}
+.drag-num-editor input.drag-num-value:focus {
+  box-shadow: inset 0 0 0 1px #4fc3f7;
+}
+@media (pointer: coarse) {
+  .drag-num-editor { height: 40px; }
+  .drag-num-editor .drag-num-step {
+    flex-basis: 40px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+  .drag-num-editor input.drag-num-value {
+    flex-basis: 56px;
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+    height: 40px;
+  }
+}
 </style>
 <script src="tts-china-client.js" defer></script>
 </head>
@@ -922,7 +1015,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
     <div class="resizer-h" id="resizeDisplayTrans"></div>
 
     <!-- 번역 패널 -->
-    <div id="translationPanel" style="border:2px dashed #3a3a4a; border-radius:5px; background:#090910; padding:7px 12px 8px; flex:0 0 72px; overflow:hidden; min-height:50px;">
+    <div id="translationPanel" style="border:2px dashed #3a3a4a; border-radius:5px; background:#090910; padding:7px 12px 8px; flex:0 0 72px; overflow-x:hidden; overflow-y:auto; min-height:50px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
         <span style="color:#44f; font-size:10px; letter-spacing:0.05em;">🌐 번역</span>
         <span id="transSourceLabel" style="color:#333; font-size:10px; flex:1; padding-left:6px;"></span>
@@ -943,8 +1036,8 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         <button onclick="toggleCharDictPanel()" style="background:none;border:none;color:#444;cursor:pointer;font-size:11px;padding:0 2px;" title="한자 패널 토글 (9)">✕</button>
       </div>
       <!-- 카드가 패널 폭을 넘으면 가로 스크롤 대신 다음 줄로 감김 (넘치면 세로 스크롤) -->
-      <div id="charDictRow" style="display:flex; gap:5px; align-items:flex-start; flex-wrap:wrap; min-height:60px;">
-        <span style="color:#333; font-size:10px; align-self:center;">자막 재생 시 표시</span>
+      <div id="charDictRow" style="display:flex; gap:var(--vp-char-row-gap, 5px); align-items:flex-start; flex-wrap:wrap; min-height:var(--vp-char-row-min-height, 60px);">
+        <span class="char-dict-empty" style="color:#333; align-self:center;">자막 재생 시 표시</span>
       </div>
     </div>
 
@@ -1089,11 +1182,21 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
           style="color:#fff; cursor:ew-resize; padding:1px 6px; background:#222; border-radius:2px; border:1px solid #333; user-select:none; min-width:32px; text-align:center;">0.0</span>
       </div>
 
-      <!-- 자막크기 -->
+      <!-- 자막·번역·한자 패널별 글자 크기 -->
       <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:#888; margin-bottom:4px;">
-        <span>자막크기</span>
-        <input id="subtitleScale" type="range" min="0.5" max="2" step="0.1" value="0.7" style="flex:1;" onchange="updateSubtitleScale()">
-        <span id="scaleValue" style="min-width:30px; text-align:right;">70%</span>
+        <label for="subtitleScale" style="min-width:58px;">자막 창</label>
+        <input id="subtitleScale" type="range" min="0.5" max="2" step="0.1" value="0.7" style="flex:1;" oninput="updateSubtitleScale(false)" onchange="updateSubtitleScale()">
+        <span id="scaleValue" style="min-width:34px; text-align:right;">70%</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:#888; margin-bottom:4px;">
+        <label for="translationPanelScale" style="min-width:58px;">번역 창</label>
+        <input id="translationPanelScale" type="range" min="0.5" max="2" step="0.1" value="1" style="flex:1;" oninput="setTranslationPanelScale(this.value,false)" onchange="setTranslationPanelScale(this.value,true)">
+        <span id="translationPanelScaleValue" style="min-width:34px; text-align:right;">100%</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:#888; margin-bottom:4px;">
+        <label for="charDictPanelScale" style="min-width:58px;">한자 창</label>
+        <input id="charDictPanelScale" type="range" min="0.5" max="2" step="0.1" value="1" style="flex:1;" oninput="setCharDictPanelScale(this.value,false)" onchange="setCharDictPanelScale(this.value,true)">
+        <span id="charDictPanelScaleValue" style="min-width:34px; text-align:right;">100%</span>
       </div>
       <div style="font-size:11px; color:#444;" id="fpsDisplay">FPS: 감지 중...</div>
     </div>
@@ -1106,7 +1209,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   <!-- 우측: 플레이리스트 + 자막리스트 + SRT편집 -->
   <div id="rightPanel" style="display:flex; flex-direction:column; flex:0 0 400px; min-width:180px; max-width:500px; overflow:hidden; position:relative; gap:0;" class="hidden">
     <!-- 플레이리스트 -->
-    <div id="playlistSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; flex:0 0 70vh; overflow:hidden; display:flex; flex-direction:column; min-height:0;">
+    <div id="playlistSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; flex:0 0 max(calc(100vh - 150px), 480px); overflow:hidden; display:flex; flex-direction:column; min-height:0;">
       <!-- 상단 고정: 타이틀 + 반복버튼 -->
       <div style="padding:8px 10px 6px; flex-shrink:0; border-bottom:1px solid #2a2a2a;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1412,6 +1515,7 @@ const SC_DEFAULTS = {
   'seek-back':      { code:'ArrowLeft',    shift:false,ctrl:false, label:'-1초',             group:'▶ 재생' },
   'seek-forward':   { code:'ArrowRight',   shift:false,ctrl:false, label:'+1초',             group:'▶ 재생' },
   'mute':           { code:'KeyM',         shift:false,ctrl:false, label:'음소거',            group:'▶ 재생' },
+  'audio-only':     { code:'KeyV',         shift:false,ctrl:false, label:'오디오 전용 모드', group:'▶ 재생' },
   'vol-down':       { code:'Comma',        shift:false,ctrl:false, label:'볼륨 −',           group:'▶ 재생' },
   'vol-up':         { code:'Period',       shift:false,ctrl:false, label:'볼륨 +',           group:'▶ 재생' },
   'open-file':      { code:'KeyO',         shift:false,ctrl:false, label:'파일 열기',         group:'▶ 재생' },
@@ -1515,7 +1619,7 @@ function cancelRebind() {
 
 function _playerKeyboardEntryTarget(target) {
   const el = target && target.nodeType === 1 ? target : target?.parentElement;
-  return !!el?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]');
+  return !!el?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],.drag-num-editor');
 }
 function _onRebindKey(e) {
   if (!_scRebinding) return;
@@ -1624,7 +1728,9 @@ let repeatTimes = 3;
 let setTimes = 1;    // 세트 반복 횟수 (자막 전체 구간을 몇 번 반복할지)
 let playCount = 0;
 let subPlayCount = 0; // 자막 구간 반복 카운트
-let subtitleScale = 0.7; // 전체 자막 크기 스케일
+let subtitleScale = 0.7; // 중앙 자막 창 크기 스케일
+let translationPanelScale = 1.0; // 번역 패널 글자 크기 스케일
+let charDictPanelScale = 1.0; // 한자 패널 글자 크기 스케일
 let startMargin = 0; // 반복 시작 여분 (초)
 let endMargin = 0; // 반복 종료 여분 (초)
 let isPlayingSubtitle = false; // 자막 선택 재생 중 여부
@@ -1922,7 +2028,7 @@ function _playerTextEntryElement(target) {
     'textarea,' +
     '[contenteditable]:not([contenteditable="false"]),' +
     'input:not([type]),input[type="text"],input[type="search"],input[type="url"],' +
-    'input[type="tel"],input[type="email"],input[type="password"],input[type="number"]'
+    'input[type="tel"],input[type="email"],input[type="password"],input[type="number"],.drag-num-editor'
   );
   if (!editor || editor.disabled || editor.readOnly) return null;
   return editor;
@@ -4809,7 +4915,7 @@ function renderCharDictImmediate(text, subtitlePinyin = '') {
   const hvo = document.getElementById('hanziVideoOverlay');
 
   if (chars.length === 0) {
-    const emptyHtml = '<span style="color:#555;font-size:10px;align-self:center;">한자 없음</span>';
+    const emptyHtml = '<span class="char-dict-empty" style="color:#555;align-self:center;">한자 없음</span>';
     if (row) {
       _clearPlayerCopyHoverWithin(row);
       row.innerHTML = emptyHtml;
@@ -5031,6 +5137,8 @@ function makeSubLineDiv(line) {
   lineDiv.dataset.copyKind = '자막';
   lineDiv.dataset.copyText = String(line.text || '');
   lineDiv.textContent = line.text;
+  lineDiv.dataset.videoFontSize = String(line.videoFontSize);
+  lineDiv.dataset.videoLineHeight = String(line.videoFontSize * 1.2);
   lineDiv.style.fontSize = (line.videoFontSize * subtitleScale) + 'px';
   lineDiv.style.lineHeight = ((line.videoFontSize * 1.2) * subtitleScale) + 'px';
   if (line.text.trim()) {
@@ -5048,24 +5156,61 @@ function makeSubLineDiv(line) {
   return lineDiv;
 }
 
-// 자막 전체 크기 조절
+// 중앙 자막 크기 조절: 현재 재생 시각 조건에 묶이지 않고 이미 표시 중인 줄에도 즉시 적용한다.
 function updateSubtitleScale(persist = true) {
   const slider = document.getElementById('subtitleScale');
-  subtitleScale = parseFloat(slider.value);
-  document.getElementById('scaleValue').textContent = Math.round(subtitleScale * 100) + '%';
-  
-  // 현재 자막 업데이트 (재생 중이면)
-  if(subIndex >= 0 && subtitles.length > 0) {
-    const currentSub = subtitles[subIndex];
-    if(video.currentTime >= currentSub.start && video.currentTime <= currentSub.end) {
-      const parsed = parseSubtitleWithStyles(currentSub.text);
-      
-      // 오버레이 업데이트
-      _clearSubtitleOverlay();
-      parsed.lines.forEach(line => overlay.appendChild(makeSubLineDiv(line)));
-      
-          // 높이는 고정값 유지
-    }
+  if (!slider) return;
+  const parsedScale = parseFloat(slider.value);
+  if (!Number.isFinite(parsedScale)) return;
+  subtitleScale = Math.max(0.5, Math.min(2, parsedScale));
+  slider.value = String(subtitleScale);
+  const label = document.getElementById('scaleValue');
+  if (label) label.textContent = Math.round(subtitleScale * 100) + '%';
+  document.querySelectorAll('#overlay .vp-copy-line[data-video-font-size]').forEach(lineDiv => {
+    const baseSize = parseFloat(lineDiv.dataset.videoFontSize);
+    const baseLineHeight = parseFloat(lineDiv.dataset.videoLineHeight);
+    if (Number.isFinite(baseSize)) lineDiv.style.fontSize = (baseSize * subtitleScale) + 'px';
+    if (Number.isFinite(baseLineHeight)) lineDiv.style.lineHeight = (baseLineHeight * subtitleScale) + 'px';
+  });
+  if (persist) { try { saveSettings(); } catch(_) {} }
+}
+
+function setTranslationPanelScale(value, persist = true) {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed)) return;
+  translationPanelScale = Math.max(0.5, Math.min(2, parsed));
+  const slider = document.getElementById('translationPanelScale');
+  if (slider) slider.value = String(translationPanelScale);
+  const label = document.getElementById('translationPanelScaleValue');
+  if (label) label.textContent = Math.round(translationPanelScale * 100) + '%';
+  [['transZh',14], ['transPyEn',10], ['transKo',12]].forEach(([id, baseSize]) => {
+    const line = document.getElementById(id);
+    if (line) line.style.fontSize = (baseSize * translationPanelScale) + 'px';
+  });
+  if (persist) { try { saveSettings(); } catch(_) {} }
+}
+
+function setCharDictPanelScale(value, persist = true) {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed)) return;
+  charDictPanelScale = Math.max(0.5, Math.min(2, parsed));
+  const slider = document.getElementById('charDictPanelScale');
+  if (slider) slider.value = String(charDictPanelScale);
+  const label = document.getElementById('charDictPanelScaleValue');
+  if (label) label.textContent = Math.round(charDictPanelScale * 100) + '%';
+  const row = document.getElementById('charDictRow');
+  if (row) {
+    const scaled = {
+      '--vp-char-card-width':52, '--vp-char-card-pad-y':3, '--vp-char-card-pad-x':2,
+      '--vp-char-pinyin-size':9, '--vp-char-pinyin-min-height':12,
+      '--vp-char-hanzi-size':26, '--vp-char-meaning-size':8, '--vp-char-meaning-max-width':50,
+      '--vp-char-space-width':10, '--vp-char-space-size':14, '--vp-char-literal-min-width':12,
+      '--vp-char-number-min-width':26, '--vp-char-ellipsis-min-width':36, '--vp-char-gap-width':10,
+      '--vp-char-row-gap':5, '--vp-char-row-min-height':60, '--vp-char-empty-size':10
+    };
+    Object.entries(scaled).forEach(([name, base]) => {
+      row.style.setProperty(name, (base * charDictPanelScale) + 'px');
+    });
   }
   if (persist) { try { saveSettings(); } catch(_) {} }
 }
@@ -5741,21 +5886,124 @@ function initDragNumbers() {
       document.addEventListener('mouseup',   onUp);
     });
 
-    // 더블클릭 → 직접 입력
-    el.addEventListener('dblclick', () => {
-      const inp = document.createElement('input');
-      inp.type  = 'number';
-      inp.step  = step();
-      inp.value = el.dataset.val;
-      inp.style.cssText = 'width:60px;background:#111;color:#fff;border:1px solid #4fc3f7;border-radius:2px;padding:1px 4px;font-size:11px;';
-      el.replaceWith(inp);
-      inp.focus(); inp.select();
-      const done = () => {
-        applyVal(parseFloat(inp.value) || startVal);
-        inp.replaceWith(el);
+    // 더블클릭 → 공통 가로형 숫자 편집기: 왼쪽 한 틱 감소, 오른쪽 한 틱 증가
+    el.addEventListener('dblclick', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startNumber = Number(el.dataset.val);
+      const editStartVal = Number.isFinite(startNumber) ? startNumber : 0;
+      const editor = document.createElement('span');
+      editor.className = 'drag-num-editor';
+      editor.setAttribute('role', 'group');
+      editor.setAttribute('aria-label', el.title || '숫자 값 조절');
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = dec() > 0 ? 'decimal' : 'numeric';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.className = 'drag-num-value';
+      input.value = editStartVal.toFixed(dec());
+      input.setAttribute('aria-label', '숫자 값 직접 입력');
+
+      const adjustBy = direction => {
+        const raw = input.value.trim();
+        const typedValue = raw === '' ? editStartVal : Number(raw);
+        const current = Number.isFinite(typedValue) ? typedValue : editStartVal;
+        const next = Math.max(minV(), Math.min(maxV(), current + direction * step()));
+        input.value = next.toFixed(dec());
       };
-      inp.addEventListener('blur',    done);
-      inp.addEventListener('keydown', ev => { if(ev.key==='Enter') done(); if(ev.key==='Escape') inp.replaceWith(el); });
+      const makeStepButton = (className, label, direction) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'drag-num-step ' + className;
+        button.textContent = label;
+        button.setAttribute('aria-label', direction < 0 ? '한 틱 감소' : '한 틱 증가');
+        button.title = direction < 0 ? '왼쪽: 한 틱 감소' : '오른쪽: 한 틱 증가';
+        button.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          adjustBy(direction);
+        });
+        return button;
+      };
+      const decrease = makeStepButton('drag-num-step--down', '−', -1);
+      const increase = makeStepButton('drag-num-step--up', '+', 1);
+      editor.append(decrease, input, increase);
+
+      const host = el.parentElement;
+      const originalHostWidth = host ? host.style.width : '';
+      let hostWidthExpanded = false;
+      let fixedFlexHost = false;
+      let otherChildrenWidth = 0;
+      let hostGap = 0;
+      let hostPadding = 0;
+      if (host) {
+        const hostStyle = getComputedStyle(host);
+        fixedFlexHost = hostStyle.display === 'flex' && /^\s*\d+(?:\.\d+)?px\s*$/.test(originalHostWidth);
+        if (fixedFlexHost) {
+          const otherChildren = Array.from(host.children).filter(child => child !== el);
+          otherChildrenWidth = otherChildren.reduce((sum, child) => sum + child.getBoundingClientRect().width, 0);
+          hostGap = parseFloat(hostStyle.columnGap) || parseFloat(hostStyle.gap) || 0;
+          hostPadding = (parseFloat(hostStyle.paddingLeft) || 0) + (parseFloat(hostStyle.paddingRight) || 0);
+        }
+      }
+
+      let closed = false;
+      let onOutsidePointerDown;
+      let onOutsideFocusIn;
+      let onWindowBlur;
+      const finish = commit => {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('pointerdown', onOutsidePointerDown, true);
+        document.removeEventListener('focusin', onOutsideFocusIn, true);
+        window.removeEventListener('blur', onWindowBlur);
+        if (commit) {
+          const raw = input.value.trim();
+          const typedValue = raw === '' ? editStartVal : Number(raw);
+          applyVal(Number.isFinite(typedValue) ? typedValue : editStartVal);
+        }
+        editor.replaceWith(el);
+        if (hostWidthExpanded) host.style.width = originalHostWidth;
+      };
+      onOutsidePointerDown = event => {
+        if (!editor.contains(event.target)) finish(true);
+      };
+      onOutsideFocusIn = event => {
+        if (!editor.contains(event.target)) finish(true);
+      };
+      onWindowBlur = () => finish(true);
+
+      el.replaceWith(editor);
+      if (fixedFlexHost) {
+        const requiredWidth = otherChildrenWidth + editor.getBoundingClientRect().width +
+          hostGap * Math.max(0, host.children.length - 1) + hostPadding;
+        if (requiredWidth > host.getBoundingClientRect().width + 1) {
+          host.style.width = Math.ceil(requiredWidth) + 'px';
+          hostWidthExpanded = true;
+        }
+      }
+      document.addEventListener('pointerdown', onOutsidePointerDown, true);
+      document.addEventListener('focusin', onOutsideFocusIn, true);
+      window.addEventListener('blur', onWindowBlur);
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.stopPropagation();
+          finish(true);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          finish(false);
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          event.stopPropagation();
+          adjustBy(event.key === 'ArrowUp' ? 1 : -1);
+        }
+      });
+      input.focus();
+      input.select();
     });
   });
 }
@@ -6162,7 +6410,8 @@ function saveSettings() {
         audioOnly: audioOnlyMode,
         transOv: transVideoOverlayEnabled,
         hanziOv: hanziVideoOverlayEnabled,
-        subtitleScale, subOverlayScale, transOverlayScale, hanziOverlayScale
+        subtitleScale, translationPanelScale, charDictPanelScale,
+        subOverlayScale, transOverlayScale, hanziOverlayScale
       }
     };
     obj._savedAt = Math.max(
@@ -6216,10 +6465,10 @@ function applyPendingLayout() {
   setFlex('translationPanel', L.transH);
   setFlex('charDictPanel',    L.dictH);
   setFlex('controlsSection',  L.controlsH);
-  // 예전 기본 높이만 70vh로 옮기고, 사용자가 리사이즈해 저장한 값은 그대로 복원한다.
+  // 이전 기본값만 브라우저 가용 높이 기반으로 옮기고, 사용자가 조절한 값은 보존한다.
   const savedPlaylistFlex = String(L.playlistH || '').trim().replace(/\s+/g, ' ');
   setFlex('playlistSection',
-    savedPlaylistFlex === '0 0 50vh' ? '0 0 70vh' : L.playlistH);
+    (savedPlaylistFlex === '0 0 50vh' || savedPlaylistFlex === '0 0 70vh') ? '0 0 max(calc(100vh - 150px), 480px)' : L.playlistH);
   setFlex('subsSection',      L.subsH);
   setFlex('editorSection',    L.editorH);
   if (L.leftPanelW) { const lp = document.getElementById('leftPanel'); if (lp) lp.style.flex = L.leftPanelW; }
@@ -6242,6 +6491,8 @@ function applyPendingLayout() {
     const sv = document.getElementById('scaleValue');
     if (sv) sv.textContent = Math.round(subtitleScale * 100) + '%';
   }
+  if (Number.isFinite(L.translationPanelScale) && L.translationPanelScale > 0) setTranslationPanelScale(L.translationPanelScale, false);
+  if (Number.isFinite(L.charDictPanelScale) && L.charDictPanelScale > 0) setCharDictPanelScale(L.charDictPanelScale, false);
   if (Number.isFinite(L.subOverlayScale)   && L.subOverlayScale > 0)   setSubOverlayScaleFromDrag(L.subOverlayScale);
   if (Number.isFinite(L.transOverlayScale) && L.transOverlayScale > 0) setTransOverlayScaleFromDrag(L.transOverlayScale);
   if (Number.isFinite(L.hanziOverlayScale) && L.hanziOverlayScale > 0) setHanziOverlayScaleFromDrag(L.hanziOverlayScale);
@@ -8543,6 +8794,10 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     toggleMute();
   }
+  else if(matchSC('audio-only', e)) {
+    e.preventDefault();
+    toggleAudioOnly();
+  }
   else if(matchSC('panel-shortcut', e)) {
     e.preventDefault();
     toggleShortcutPanel();
@@ -8753,6 +9008,46 @@ document.getElementById('editorSection').addEventListener('wheel', (e) => {
   const ta = document.getElementById('editor');
   ta.scrollTop += e.deltaY > 0 ? 60 : -60;
 }, { passive: false });
+
+// Ctrl+휠은 세 글자 표시 패널에서만 해당 글자 크기를 조절한다.
+const _panelFontWheelTargets = [
+  { panelId:'subtitleDisplay', sliderId:'subtitleScale', apply:() => updateSubtitleScale(false) },
+  { panelId:'translationPanel', sliderId:'translationPanelScale', apply:value => setTranslationPanelScale(value, false) },
+  { panelId:'charDictPanel', sliderId:'charDictPanelScale', apply:value => setCharDictPanelScale(value, false) }
+];
+const _panelFontWheelDeltaByPanel = Object.create(null);
+let _panelFontWheelSaveTimer = null;
+_panelFontWheelTargets.forEach(config => {
+  const panel = document.getElementById(config.panelId);
+  if (!panel || panel.dataset.fontScaleWheelBound === 'true') return;
+  panel.dataset.fontScaleWheelBound = 'true';
+  panel.addEventListener('wheel', event => {
+    if (!event.ctrlKey || !event.deltaY) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const slider = document.getElementById(config.sliderId);
+    if (!slider) return;
+    const deltaY = event.deltaMode === 1 ? event.deltaY * 16 :
+      (event.deltaMode === 2 ? event.deltaY * window.innerHeight : event.deltaY);
+    const accumulated = (_panelFontWheelDeltaByPanel[config.panelId] || 0) + deltaY;
+    const steps = Math.trunc(accumulated / 100);
+    _panelFontWheelDeltaByPanel[config.panelId] = accumulated - steps * 100;
+    if (!steps) return;
+    const current = parseFloat(slider.value);
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    if (![current, min, max].every(Number.isFinite)) return;
+    const next = Math.max(min, Math.min(max, Math.round((current - steps * 0.1) * 10) / 10));
+    if (next === current) return;
+    slider.value = String(next);
+    config.apply(next);
+    clearTimeout(_panelFontWheelSaveTimer);
+    _panelFontWheelSaveTimer = setTimeout(() => {
+      _panelFontWheelSaveTimer = null;
+      try { saveSettings(); } catch(_) {}
+    }, 300);
+  }, { passive:false });
+});
 
 // 전역: leftPanel 안에서만 볼륨, 타임라인/우측패널/기타 UI 바깥은 무시
 document.addEventListener('wheel', (e) => {
