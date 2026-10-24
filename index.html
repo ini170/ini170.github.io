@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iniVideoPlayer 열기</title>
+  <style>
+    body { margin: 2rem; font-family: system-ui, sans-serif; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <p>비디오 플레이어를 여는 중입니다.</p>
+  <!-- 새 버전을 업로드한 뒤, 아래 href의 파일명만 바꾸면 됩니다. -->
+  <p><a id="player-link" href="./iniVideoPlayer_260817_0411.html">플레이어 열기</a></p>
+  <noscript><p>자동으로 이동하지 않으면 위 링크를 눌러 주세요.</p></noscript>
+  <script>
+    const playerLink = document.getElementById('player-link');
+    const target = new URL(playerLink.href);
+    target.search = window.location.search;
+    target.hash = window.location.hash;
+    playerLink.href = target.href;
+    window.location.replace(target.href);
+  </script>
+</body>
+</html>
