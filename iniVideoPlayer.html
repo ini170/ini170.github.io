@@ -819,64 +819,19 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 }
 #hanziVideoOverlay.active { display: flex; }
 
-/* ===== Shift + hover overlay toggles ===== */
-#overlayInteractionHud {
-  position:absolute;
-  top:8px;
-  left:8px;
-  z-index:60;
-  display:none;
-  flex-wrap:wrap;
-  align-items:center;
-  gap:5px;
-  max-width:calc(100% - 16px);
-  padding:5px 7px;
-  border:1px solid rgba(79,195,247,.72);
-  border-radius:5px;
-  color:#eaf5ff;
-  background:rgba(6,12,22,.94);
-  box-shadow:0 2px 9px rgba(0,0,0,.55);
-  font-size:11px;
-  line-height:1.25;
-  pointer-events:auto;
+/* ===== Shift + hover on the existing video overlay text ===== */
+#overlay.on-video.shift-overlay-target {
+  text-shadow: 0 0 6px #000, 0 2px 8px #000, 0 0 7px rgba(79,195,247,.95) !important;
 }
-#videoContainer.overlay-shift-interaction #overlayInteractionHud { display:flex; }
-#overlayInteractionHud .overlay-interaction-hint {
-  color:#9eb8ce;
-  padding:0 3px;
-  white-space:nowrap;
-}
-#overlayInteractionHud button {
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-  padding:4px 7px;
-  border:1px solid #53616d;
-  border-radius:4px;
-  color:#d8e2ea;
-  background:#202832;
-  font-size:11px;
-  line-height:1.2;
-  cursor:pointer;
-  white-space:nowrap;
-}
-#overlayInteractionHud button[aria-pressed="true"] {
-  color:#effcff;
-  border-color:#13b9d2;
-  background:#075065;
-}
-#overlayInteractionHud .overlay-toggle-state {
-  color:#a0abb4;
-  font-size:9px;
-  font-weight:700;
-}
-#overlayInteractionHud button[aria-pressed="true"] .overlay-toggle-state { color:#87f0ff; }
-@media (max-width:380px) {
-  #overlayInteractionHud { gap:3px; padding:4px; font-size:10px; }
-  #overlayInteractionHud button { padding:4px 5px; font-size:10px; }
+#transVideoOverlay.shift-overlay-target .tvo-zh,
+#transVideoOverlay.shift-overlay-target .tvo-pyen,
+#transVideoOverlay.shift-overlay-target .tvo-ko,
+#hanziVideoOverlay.shift-overlay-target .char-card {
+  filter: drop-shadow(0 0 3px rgba(79,195,247,.9));
 }
 
 /* ===== 오디오 전용 모드 바 ===== */
+
 #audioModeBar {
   display: none;
   border: 2px dashed #2a4a8a;
@@ -1039,20 +994,9 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       </div>
       <!-- 드래그 수신용 투명 오버레이 (video 위에서 이벤트 가로채기) -->
       <div id="dropOverlay" style="position:absolute;inset:0;z-index:10;pointer-events:none;"></div>
-      <!-- Shift를 누르고 영상에 호버하면 표시되는 영상 위 자막 토글 -->
-      <div id="overlayInteractionHud" role="group" aria-label="영상 위 표시 전환" aria-hidden="true">
-        <span class="overlay-interaction-hint">Shift + 클릭 전환</span>
-        <button type="button" data-overlay-toggle="subtitle" aria-pressed="false" title="Shift+클릭으로 영상 위 자막 표시 전환">
-          <span>자막</span><span class="overlay-toggle-state">OFF</span>
-        </button>
-        <button type="button" data-overlay-toggle="translation" aria-pressed="false" title="Shift+클릭으로 영상 위 번역 표시 전환">
-          <span>번역</span><span class="overlay-toggle-state">OFF</span>
-        </button>
-        <button type="button" data-overlay-toggle="hanzi" aria-pressed="false" title="Shift+클릭으로 영상 위 한자 표시 전환">
-          <span>한자</span><span class="overlay-toggle-state">OFF</span>
-        </button>
-      </div>
+      <!-- Shift+클릭은 새 UI 없이 현재 영상 위 세 표시 문자열을 각각 전환합니다. -->
       <!-- 번역 영상 위 오버레이 (중단 고정) -->
+
       <div id="transVideoOverlay">
         <div class="tvo-zh"></div>
         <div class="tvo-pyen"></div>
@@ -10307,11 +10251,36 @@ function updateTopFloatUI() {
 
 // ===== 하단 플로팅 패널 =====
 let bottomFloatOpen = false;
+let bottomFloatHoverOpen = false;
+function syncBottomFloatPanel() {
+  const panel = document.getElementById('bottomFloatPanel');
+  const tab = document.getElementById('bottomFloatTab');
+  if (!panel || !tab) return;
+  const isOpen = bottomFloatOpen || bottomFloatHoverOpen;
+  panel.classList.toggle('panel-open', isOpen);
+  tab.textContent = isOpen ? '▼ 컨트롤' : '▲ 컨트롤';
+  if (isOpen) updateBottomFloatUI();
+}
 function toggleBottomFloat() {
   bottomFloatOpen = !bottomFloatOpen;
-  document.getElementById('bottomFloatPanel').classList.toggle('panel-open', bottomFloatOpen);
-  document.getElementById('bottomFloatTab').textContent = bottomFloatOpen ? '▼ 컨트롤' : '▲ 컨트롤';
-  if (bottomFloatOpen) updateBottomFloatUI();
+  syncBottomFloatPanel();
+}
+function installBottomFloatHoverControls() {
+  const panel = document.getElementById('bottomFloatPanel');
+  if (!panel || panel.dataset.hoverControlsReady === '1') return;
+  panel.dataset.hoverControlsReady = '1';
+  const hoverAvailable = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)');
+  if (!hoverAvailable || !hoverAvailable.matches) return;
+  panel.addEventListener('pointerenter', event => {
+    if (event.pointerType !== 'mouse') return;
+    bottomFloatHoverOpen = true;
+    syncBottomFloatPanel();
+  });
+  panel.addEventListener('pointerleave', event => {
+    if (event.pointerType !== 'mouse') return;
+    bottomFloatHoverOpen = false;
+    syncBottomFloatPanel();
+  });
 }
 let shortcutPanelOpen = false;
 function toggleShortcutPanel() {
@@ -10387,7 +10356,7 @@ function toggleAudioOnly() {
     resizer.style.display = '';
   }
   updateTopFloatUI(); updateBottomFloatUI();
-  updateOverlayInteractionHud();
+  updateOverlayShiftTarget();
   try { saveSettings(); } catch(_) {}
 }
 
@@ -10401,96 +10370,128 @@ function _updateAudioModeTitle() {
   }
 }
 
-// ===== Shift + hover 영상 위 표시 전환 =====
-let overlayInteractionPointerInside = false;
+// ===== Shift + hover: 기존 영상 위 문자열에서 직접 표시 전환 =====
 let overlayInteractionShiftHeld = false;
+let overlayInteractionPointer = null;
+const overlayShiftTargetClass = 'shift-overlay-target';
 
-function syncOverlayInteractionHud() {
-  const buttons = document.querySelectorAll('#overlayInteractionHud [data-overlay-toggle]');
-  buttons.forEach(button => {
-    const key = button.dataset.overlayToggle;
-    const enabled = key === 'subtitle' ? subOverlayMode
-      : key === 'translation' ? transVideoOverlayEnabled
-      : key === 'hanzi' ? hanziVideoOverlayEnabled : false;
-    button.setAttribute('aria-pressed', String(enabled));
-    const state = button.querySelector('.overlay-toggle-state');
-    if (state) state.textContent = enabled ? 'ON' : 'OFF';
-  });
+function getOverlayTextRects(root) {
+  if (!root) return [];
+  const rootStyle = getComputedStyle(root);
+  if (rootStyle.display === 'none' || rootStyle.visibility === 'hidden' || Number(rootStyle.opacity) === 0) return [];
+  const rects = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!String(node.nodeValue || '').trim()) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) {
+      if (rect.width > 0 && rect.height > 0) rects.push(rect);
+    }
+  }
+  return rects;
 }
 
-function updateOverlayInteractionHud() {
-  const container = document.getElementById('videoContainer');
-  const hud = document.getElementById('overlayInteractionHud');
-  if (!container || !hud) return;
-  const visible = overlayInteractionPointerInside && overlayInteractionShiftHeld && !audioOnlyMode;
-  container.classList.toggle('overlay-shift-interaction', visible);
-  hud.setAttribute('aria-hidden', String(!visible));
+function findOverlayTextTargetAt(x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || audioOnlyMode) return null;
+  const layers = [
+    { key:'subtitle', element:document.getElementById('overlay'), enabled:subOverlayMode },
+    { key:'translation', element:document.getElementById('transVideoOverlay'), enabled:transVideoOverlayEnabled },
+    { key:'hanzi', element:document.getElementById('hanziVideoOverlay'), enabled:hanziVideoOverlayEnabled },
+  ];
+  const matches = [];
+  for (const layer of layers) {
+    if (!layer.enabled || !layer.element) continue;
+    const rects = getOverlayTextRects(layer.element);
+    if (!rects.some(rect => x >= rect.left - 3 && x <= rect.right + 3 && y >= rect.top - 3 && y <= rect.bottom + 3)) continue;
+    const z = Number.parseInt(getComputedStyle(layer.element).zIndex, 10);
+    matches.push({ ...layer, z:Number.isFinite(z) ? z : 0 });
+  }
+  matches.sort((a,b) => {
+    if (a.z !== b.z) return b.z - a.z;
+    const position = a.element.compareDocumentPosition(b.element);
+    return position & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1;
+  });
+  return matches[0] || null;
+}
+
+function updateOverlayShiftTarget(x, y) {
+  if (Number.isFinite(x) && Number.isFinite(y)) overlayInteractionPointer = { x, y };
+  const targets = [
+    document.getElementById('overlay'),
+    document.getElementById('transVideoOverlay'),
+    document.getElementById('hanziVideoOverlay'),
+  ];
+  targets.forEach(element => element?.classList.remove(overlayShiftTargetClass));
+  if (!overlayInteractionShiftHeld || !overlayInteractionPointer || audioOnlyMode) return;
+  const target = findOverlayTextTargetAt(overlayInteractionPointer.x, overlayInteractionPointer.y);
+  target?.element.classList.add(overlayShiftTargetClass);
 }
 
 function installOverlayShiftInteraction() {
   const container = document.getElementById('videoContainer');
-  const hud = document.getElementById('overlayInteractionHud');
-  if (!container || !hud || container.dataset.overlayShiftReady === '1') return;
+  if (!container || container.dataset.overlayShiftReady === '1') return;
   container.dataset.overlayShiftReady = '1';
 
-  container.addEventListener('pointerenter', () => {
-    overlayInteractionPointerInside = true;
-    updateOverlayInteractionHud();
-  });
+  container.addEventListener('pointermove', event => {
+    if (event.pointerType === 'touch') return;
+    updateOverlayShiftTarget(event.clientX, event.clientY);
+  }, { passive:true });
   container.addEventListener('pointerleave', () => {
-    overlayInteractionPointerInside = false;
-    updateOverlayInteractionHud();
+    overlayInteractionPointer = null;
+    updateOverlayShiftTarget();
   });
 
   const handleShift = event => {
     if (event.key !== 'Shift') return;
     overlayInteractionShiftHeld = event.type === 'keydown';
-    updateOverlayInteractionHud();
+    updateOverlayShiftTarget();
   };
   window.addEventListener('keydown', handleShift, true);
   window.addEventListener('keyup', handleShift, true);
   window.addEventListener('blur', () => {
     overlayInteractionShiftHeld = false;
-    updateOverlayInteractionHud();
+    updateOverlayShiftTarget();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       overlayInteractionShiftHeld = false;
-      updateOverlayInteractionHud();
+      updateOverlayShiftTarget();
     }
   });
 
-  hud.addEventListener('click', event => {
-    const button = event.target.closest('[data-overlay-toggle]');
-    if (!button || !event.shiftKey) return;
+  container.addEventListener('click', event => {
+    if ((!event.shiftKey && !overlayInteractionShiftHeld) || audioOnlyMode) return;
+    const target = findOverlayTextTargetAt(event.clientX, event.clientY);
+    if (!target) return;
     event.preventDefault();
-    event.stopPropagation();
-    if (button.dataset.overlayToggle === 'subtitle') toggleSubOverlay();
-    else if (button.dataset.overlayToggle === 'translation') toggleTransVideoOverlay();
-    else if (button.dataset.overlayToggle === 'hanzi') toggleHanziVideoOverlay();
-    syncOverlayInteractionHud();
-    updateOverlayInteractionHud();
-  });
+    event.stopImmediatePropagation();
+    if (target.key === 'subtitle') toggleSubOverlay();
+    else if (target.key === 'translation') toggleTransVideoOverlay();
+    else if (target.key === 'hanzi') toggleHanziVideoOverlay();
+    updateOverlayShiftTarget(event.clientX, event.clientY);
+  }, true);
 
   window.addEventListener('message', event => {
     if (event.source !== window.parent) return;
     const message = event.data;
     if (!message || message.llt !== 'vp-overlay-shift-state') return;
     overlayInteractionShiftHeld = message.down === true;
-    updateOverlayInteractionHud();
+    updateOverlayShiftTarget();
   });
-  syncOverlayInteractionHud();
-  updateOverlayInteractionHud();
+  updateOverlayShiftTarget();
 }
 
 // ===== 번역/한자 영상 위 오버레이 =====
+
 let transVideoOverlayEnabled = false;
 let hanziVideoOverlayEnabled = false;
 
 function toggleTransVideoOverlay() {
   transVideoOverlayEnabled = !transVideoOverlayEnabled;
   document.getElementById('transVideoOverlay').classList.toggle('active', transVideoOverlayEnabled);
-  syncOverlayInteractionHud();
+  updateOverlayShiftTarget();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
 }
@@ -10498,7 +10499,7 @@ function toggleTransVideoOverlay() {
 function toggleHanziVideoOverlay() {
   hanziVideoOverlayEnabled = !hanziVideoOverlayEnabled;
   document.getElementById('hanziVideoOverlay').classList.toggle('active', hanziVideoOverlayEnabled);
-  syncOverlayInteractionHud();
+  updateOverlayShiftTarget();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
 }
@@ -10551,7 +10552,7 @@ function toggleSubOverlay() {
     subtitleDisplay.style.display = '';
     document.getElementById('resizeTimelineDisplay').style.display = '';
   }
-  syncOverlayInteractionHud();
+  updateOverlayShiftTarget();
   updateTopFloatUI();
   updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
@@ -10598,7 +10599,7 @@ function installVideoTouchGestures() {
 
     const touch = event.changedTouches[0] || event.touches[0];
     const target = event.target instanceof Element ? event.target : null;
-    if (target && target.closest('#overlayInteractionHud, #playlistPermissionGate, button, input, select, textarea, a, [contenteditable="true"]')) return;
+    if (target && target.closest('#playlistPermissionGate, button, input, select, textarea, a, [contenteditable="true"]')) return;
 
     const rect = videoElement.getBoundingClientRect();
     if (rect.width < 8 || rect.height < 100) return;
@@ -10680,6 +10681,7 @@ function installVideoTouchGestures() {
 }
 installOverlayShiftInteraction();
 installVideoTouchGestures();
+installBottomFloatHoverControls();
 // ===== 레이아웃 프리셋 =====
 // 프리셋 0: 사용자가 저장, 프리셋 1: 영상 큰 버전 (기본 내장)
 // 사용자 저장 슬롯 (slot 0)
