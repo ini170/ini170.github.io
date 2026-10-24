@@ -7965,87 +7965,6 @@ async function _collectPlaylistFolderRecords(root) {
   };
 }
 
-// 임베드(file:// iframe)에서는 showDirectoryPicker가 차단될 수 있다.
-// 사용자가 누른 숨김 <input webkitdirectory>가 반환한 File 목록을 같은 규칙으로 연결한다.
-function _indexPlaylistFolderFiles(files) {
-  const byName = new Map();
-  const byPath = new Map();
-  const subtitles = [];
-  Array.from(files || []).forEach(file => {
-    const fullPath = String(file.webkitRelativePath || file.name || '').replace(/\\/g, '/');
-    const parts = fullPath.split('/').filter(Boolean);
-    const path = (parts.length > 1 ? parts.slice(1) : parts).join('/');
-    const name = file.name || parts[parts.length - 1] || '';
-    const lower = name.toLowerCase();
-    if (!VIDEO_EXT.test(name) && !lower.endsWith('.srt')) return;
-    const entry = { file, path:path || name, name, sourceRootName:parts.length > 1 ? parts[0] : '' };
-    const pathKey = entry.path.toLowerCase();
-    if (!byPath.has(pathKey)) byPath.set(pathKey, []);
-    byPath.get(pathKey).push(entry);
-    if (!byName.has(lower)) byName.set(lower, []);
-    byName.get(lower).push(entry);
-    if (lower.endsWith('.srt')) subtitles.push(entry);
-  });
-  return { byName, byPath, subtitles };
-}
-
-function _takeFolderFileEntry(index, relativePath, name, usedPaths, preferredDirectory) {
-  const normalizedPath = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
-  let entry = normalizedPath
-    ? _takeIndexedEntry(index.byPath.get(normalizedPath), preferredDirectory, usedPaths)
-    : null;
-  if (!entry && name) entry = _takeIndexedEntry(index.byName.get(String(name).toLowerCase()), preferredDirectory, usedPaths);
-  return entry || null;
-}
-
-async function _applyPlaylistFolderInputFiles(files, playIndex = currentIndex, autoPlay = true) {
-  const index = _indexPlaylistFolderFiles(files);
-  const manifest = _playlistFolderManifest();
-  const usedVideoPaths = new Set();
-  const usedSrtPaths = new Set();
-  const records = [];
-  let readyVideos = 0;
-  let missingVideos = 0;
-  let missingSubtitles = 0;
-
-  manifest.forEach(requested => {
-    const videoName = requested.videoName || String(requested.videoPath || '').split('/').pop() || '';
-    const expectedSrtName = requested.srtName || String(requested.srtPath || '').split('/').pop() || '';
-    const preferredDirectory = _pathDirectory(requested.videoPath);
-    const videoEntry = _takeFolderFileEntry(index, requested.videoPath, videoName, usedVideoPaths, preferredDirectory);
-    let srtEntry = _takeFolderFileEntry(index, requested.srtPath, expectedSrtName, usedSrtPaths, preferredDirectory);
-
-    if (!srtEntry && videoName) {
-      const base = _fileBaseName(videoName);
-      const candidates = index.subtitles.filter(entry => {
-        const srtBase = _fileBaseName(entry.name);
-        return srtBase === base || srtBase.startsWith(base + '.');
-      });
-      srtEntry = _takeIndexedEntry(candidates, videoEntry ? _pathDirectory(videoEntry.path) : preferredDirectory, usedSrtPaths);
-    }
-
-    if (videoEntry) readyVideos++; else missingVideos++;
-    const expectedSrt = !!(expectedSrtName || requested.srtPath);
-    if (!srtEntry && expectedSrt) missingSubtitles++;
-    records.push({
-      index:requested.index,
-      videoFile:videoEntry?.file || null,
-      videoPath:videoEntry?.path || '',
-      sourceRootName:videoEntry?.sourceRootName || '',
-      srtFile:srtEntry?.file || null,
-      srtPath:srtEntry?.path || '',
-      expectedSrt
-    });
-  });
-
-  await _applyBrokeredPlaylistFiles({
-    records, readyVideos, missingVideos, missingSubtitles,
-    scopeApplied:readyVideos > 0,
-    playIndex:Number.isInteger(playIndex) ? playIndex : currentIndex,
-    autoPlay:autoPlay !== false
-  });
-}
-
 async function _relinkPlaylistFromRoot(root) {
   const index = await _indexPlaylistRoot(root);
   const usedVideoPaths = new Set();
@@ -9043,7 +8962,7 @@ function movePlaylistItemDown() {
 // ===== 파일 로딩 공통 =====
 const VIDEO_EXT = /\.(mp3|mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i;
 
-// 파일 선택 폴백의 webkitRelativePath에서 폴더 내 상대경로를 보존한다.
+// 폴더 드롭으로 전달된 파일의 상대경로를 경로 목록에 보존한다.
 function _playlistInputFileLocation(file) {
   const full = String(file?._dropRelativePath || file?.webkitRelativePath || '').replace(/\\/g, '/');
   const parts = full.split('/').filter(Boolean);
