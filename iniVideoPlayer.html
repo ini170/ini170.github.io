@@ -1106,7 +1106,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   <!-- 우측: 플레이리스트 + 자막리스트 + SRT편집 -->
   <div id="rightPanel" style="display:flex; flex-direction:column; flex:0 0 400px; min-width:180px; max-width:500px; overflow:hidden; position:relative; gap:0;" class="hidden">
     <!-- 플레이리스트 -->
-    <div id="playlistSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; flex:0 0 50vh; overflow:hidden; display:flex; flex-direction:column; min-height:0;">
+    <div id="playlistSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; flex:0 0 70vh; overflow:hidden; display:flex; flex-direction:column; min-height:0;">
       <!-- 상단 고정: 타이틀 + 반복버튼 -->
       <div style="padding:8px 10px 6px; flex-shrink:0; border-bottom:1px solid #2a2a2a;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1124,12 +1124,15 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       <!-- 하단 고정: 파일 선택 + 권한/재구성/초기화 (margin-top:auto 로 항상 최하단 픽스) -->
       <div style="padding:6px 8px; flex-shrink:0; flex-grow:0; border-top:1px solid #2a2a2a; margin-top:auto; background:#0a0a0a;">
         <div style="display:flex; gap:4px;">
-          <button id="playlistFileImportButton" onclick="openFilePickerFSA()" style="flex:1; padding:5px; background:#222; color:#aaa; border:1px dashed #555; border-radius:3px; font-size:11px; cursor:pointer;" title="영상과 SRT를 선택해 현재 목록에 추가합니다. 다른 폴더에서도 반복해서 추가할 수 있습니다.">＋ 파일 추가</button>
-          <button id="playlistFolderImportButton" onclick="openPlaylistFolderFSA()" style="flex:1; padding:5px; background:#17251d; color:#9ed4b0; border:1px dashed #2a6a4a; border-radius:3px; font-size:11px; cursor:pointer;" title="선택한 폴더의 영상과 SRT를 현재 목록에 추가합니다. 여러 폴더를 차례로 추가할 수 있습니다.">📁 폴더 추가</button>
+          <button id="playlistFileImportButton" type="button" onclick="openFilePickerFSA()" style="flex:1; padding:5px; background:#222; color:#aaa; border:1px dashed #555; border-radius:3px; font-size:11px; cursor:pointer;" title="영상과 SRT를 선택해 현재 목록에 추가합니다. 다른 폴더에서도 반복해서 추가할 수 있습니다.">＋ 파일 추가</button>
+          <button id="playlistFolderImportButton" type="button" onclick="openPlaylistFolderFSA()" style="flex:1; padding:5px; background:#17251d; color:#9ed4b0; border:1px dashed #2a6a4a; border-radius:3px; font-size:11px; cursor:pointer;" title="선택한 폴더의 영상과 SRT를 현재 목록에 추가합니다. 여러 폴더를 차례로 추가할 수 있습니다.">📁 폴더 추가</button>
         </div>
-        <style>#playlistImportStatus:empty{display:none}</style>
-        <div id="playlistImportStatus" data-build="C245" role="status" aria-live="polite" style="font-size:11px;color:#e6b96b;padding:4px 0;overflow-wrap:anywhere"></div>
-        <button id="playlistBasicImportButton" data-build="C245" type="button" onclick="document.getElementById('fileInput').click()" style="width:100%;padding:4px;background:#222;color:#b9cde0;border:1px solid #555;border-radius:3px" title="파일 권한 전달 없이 바로 엽니다. 새로고침 후에는 파일을 다시 선택해야 합니다.">일반 파일 열기 · 불러오기 실패 시</button>
+        <details id="playlistFallbackDetails" style="margin-top:2px;color:#777;font-size:10px">
+          <summary style="cursor:pointer;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">보조 불러오기 · 임시 파일 열기</summary>
+          <style>#playlistImportStatus:empty{display:none}</style>
+          <div id="playlistImportStatus" data-build="C308" role="status" aria-live="polite" style="font-size:10px;color:#9a9a9a;padding:2px 0;overflow-wrap:anywhere"></div>
+          <button id="playlistBasicImportButton" data-build="C308" type="button" onclick="document.getElementById('fileInput').click()" style="width:100%;padding:4px;background:#1b1b1b;color:#999;border:1px solid #383838;border-radius:3px;font-size:10px" title="파일 권한을 보관하지 않는 임시 가져오기입니다. 새로고침 뒤 파일을 다시 선택해야 합니다.">권한 저장 없이 임시 파일 열기</button>
+        </details>
         <div style="display:flex; gap:4px; margin-top:4px;">
           <button id="playlistRootConnectFooterButton" onclick="openFilePickerFSA()" style="flex:1; padding:4px 2px; background:#163a2a; color:#9ed4b0; border:1px solid #2a6a4a; border-radius:3px; font-size:10px; cursor:pointer;" title="저장 핸들이 없는 항목의 영상과 SRT를 다시 선택합니다. 다른 폴더에서도 반복할 수 있습니다.">＋ 파일 다시 추가</button>
           <button id="playlistPermissionFooterButton" onclick="grantAllPermissions()" style="display:none; flex:1; padding:4px 2px; background:#1a3a1a; color:#9ec59e; border:1px solid #2a5a2a; border-radius:3px; font-size:10px; cursor:pointer;" title="재생목록에 저장된 모든 영상과 SRT의 권한을 한 번에 요청">🔓 전체 파일 권한</button>
@@ -1486,12 +1489,15 @@ function getSC(id) {
 function matchSC(id, e) {
   const sc = getSC(id);
   if (!sc) return false;
-  return e.code === sc.code && e.shiftKey === sc.shift && e.ctrlKey === sc.ctrl && e.altKey === (sc.alt === true);
+  const codeMatches = e.code === sc.code ||
+    (id === 'pl-open-location' && sc.code === 'Enter' && e.code === 'NumpadEnter' && e.key === 'Enter');
+  return codeMatches && e.shiftKey === sc.shift && e.ctrlKey === sc.ctrl && e.altKey === (sc.alt === true);
 }
 function saveSC() {
   localStorage.setItem('iniVP_SC', JSON.stringify(customSC));
   renderShortcutPanel();
   try { saveSettings(); } catch(_) {}
+  _postPlaylistSelectionState();
 }
 function resetSC(id) { delete customSC[id]; saveSC(); }
 function resetAllSC() { customSC = {}; saveSC(); }
@@ -1573,9 +1579,16 @@ let playlist = [];
 let currentIndex = 0;
 let subtitles = [];
 let subIndex = -1;
+let manualCueSelectionIndex = -1;
+let pendingManualCueSelectionIndex = -1;
+let loopCueSelectionIndex = -1; // 횟수 반복 중 seek 완료 이벤트가 이전 겹침 cue로 되돌리지 못하도록 고정
+let pendingLoopCueSeek = null; // { index, targetTime, awaitingSeeking, awaitingSeeked } — 프로그램 seek 이벤트 식별
+let loopUserSeekPending = false;
+let loopAllBoundaryHandledIndex = -1; // 횟수 반복: cue 종료 경계를 한 재생 pass에서 한 번만 처리
 let initialSubIndex = -1; // 반복 시작 지점 저장
 let loopMode = 'none'; // 'none' / 'sub' / 'all' / 'range'
 let loopRewinding = false;
+let loopRewindReleaseGeneration = 0;
 let rangeStart = null;      // 구간반복 시작점 (초)
 let rangeEnd = null;        // 구간반복 끝점 (초)
 let rangeLoopEnabled = false; // 구간반복 토글 (loopMode와 독립)
@@ -1600,6 +1613,7 @@ let playlistHostNeedsReconnect = false; // 재생목록과 현재 폴더가 연�
 let playlistHostNoticeKey = '';
 let playlistHostRequestTimer = 0;
 let playlistHostSnapshotTimer = 0;
+let playlistImportStatusTimer = null;
 let playlistHostSnapshotPending = false;
 let playlistPendingHostAccessResult = null;
 let playlistHostedMode = new URLSearchParams(location.search).get('embedded') === '1';
@@ -2308,6 +2322,26 @@ function handleFiles(files) {
   }
 }
 
+function _setPlaylistImportStatus(message, duration = 4500) {
+  const status = document.getElementById('playlistImportStatus');
+  const details = document.getElementById('playlistFallbackDetails');
+  clearTimeout(playlistImportStatusTimer);
+  playlistImportStatusTimer = null;
+  if (!status) return;
+  const text = String(message || '');
+  status.textContent = text;
+  if (details) details.open = !!text;
+  if (!text) return;
+  if (duration > 0) {
+    playlistImportStatusTimer = setTimeout(() => {
+      if (status.textContent === text) {
+        status.textContent = '';
+        if (details) details.open = false;
+      }
+      playlistImportStatusTimer = null;
+    }, duration);
+  }
+}
 // 수신 단계 오류는 송신자의 postMessage catch로 전달되지 않는다.
 window.addEventListener('messageerror', event => {
   if (event.source && event.source !== parent) return;
@@ -2315,8 +2349,7 @@ window.addEventListener('messageerror', event => {
   playlistPickerBusy = false;
   playlistPermissionBusy = false;
   _updatePlaylistPermissionUI();
-  const status = document.getElementById('playlistImportStatus');
-  if (status) status.textContent = '브라우저가 파일 전달을 차단했습니다. 메인 학습기를 새로고침하거나 아래 일반 파일 열기를 사용하세요.';
+  _setPlaylistImportStatus('브라우저가 파일 전달을 차단했습니다. 다시 시도하거나 보조 불러오기에서 임시 파일 열기를 사용하세요.');
 });
 
 // 파일 입력 — 기존 목록에 추가, 현재 재생 유지
@@ -2325,10 +2358,9 @@ document.getElementById('fileInput').onchange = e => {
   const folderFallback = input.dataset.folderPicker === '1';
   if (chosen.some(file => VIDEO_EXT.test(file.name))) addFilesToPlaylist(chosen, true);
   else handleFiles(files);
-  const status = document.getElementById('playlistImportStatus');
-  if (status) status.textContent = files.length
-    ? (folderFallback ? '폴더 선택으로 임시 추가했습니다. 새로고침 뒤 다시 선택해야 합니다.' : '일반 파일로 열었습니다. 새로고침 후에는 다시 선택해 주세요.')
-    : '';
+  _setPlaylistImportStatus(files.length
+    ? (folderFallback ? '폴더에서 임시로 추가했습니다. 새로고침 뒤 다시 선택해야 합니다.' : '임시로 열었습니다. 새로고침 뒤 파일을 다시 선택해야 합니다.')
+    : '');
   input.value = '';
   delete input.dataset.folderPicker;
   input.removeAttribute('webkitdirectory');
@@ -2361,22 +2393,44 @@ function _playlistHoverTargetIndex() {
 }
 
 let _lastPostedPlaylistSelectionCount = -1;
+let _lastPostedPlaylistLocationIndex = -2;
+let _lastPostedPlaylistLocationShortcut = '';
 let _lastPostedPlayerCopyContextActive = null;
 function _postPlaylistSelectionState() {
   if (!_isEmbeddedPlaylistPlayer() || window.parent === window) return false;
   const count = Array.from(selectedIndices)
     .filter(index => index >= 0 && index < playlist.length).length;
+  const selectedIndex = _playlistLocationTargetIndex();
+  const shortcut = getSC('pl-open-location') || {};
+  const locationShortcut = {
+    code:String(shortcut.code || ''), ctrl:shortcut.ctrl === true,
+    shift:shortcut.shift === true, alt:shortcut.alt === true
+  };
+  const locationShortcutKey = JSON.stringify(locationShortcut);
   const copyContextActive = count > 0 || _playlistHoverTargetIndex() >= 0 || !!_panelHoverCopyPayload();
   if (count === _lastPostedPlaylistSelectionCount &&
+      selectedIndex === _lastPostedPlaylistLocationIndex &&
+      locationShortcutKey === _lastPostedPlaylistLocationShortcut &&
       copyContextActive === _lastPostedPlayerCopyContextActive) return false;
   _lastPostedPlaylistSelectionCount = count;
+  _lastPostedPlaylistLocationIndex = selectedIndex;
+  _lastPostedPlaylistLocationShortcut = locationShortcutKey;
   _lastPostedPlayerCopyContextActive = copyContextActive;
   try {
-    window.parent.postMessage({ llt:'vp-playlist-selection-state', count, copyContextActive }, '*');
+    window.parent.postMessage({ llt:'vp-playlist-selection-state', count, selectedIndex, locationShortcut, copyContextActive }, '*');
     return true;
   } catch (_) {
     return false;
   }
+}
+
+function _playlistBestKnownPath(...values) {
+  return values.map(value => String(value || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
+    .filter(Boolean)
+    .sort((a, b) => {
+      const depth = b.split('/').filter(Boolean).length - a.split('/').filter(Boolean).length;
+      return depth || b.length - a.length;
+    })[0] || '';
 }
 
 function _playlistParentFromKnownPath(path, sourceRootName = '') {
@@ -2385,7 +2439,7 @@ function _playlistParentFromKnownPath(path, sourceRootName = '') {
   const parts = normalized.split('/').filter(Boolean);
   if (parts.length) parts.pop();
   const rootName = String(sourceRootName || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-  if (rootName && parts[0] !== rootName) parts.unshift(rootName);
+  if (rootName && String(parts[0] || '').toLocaleLowerCase() !== rootName.toLocaleLowerCase()) parts.unshift(rootName);
   return parts.join('\\');
 }
 
@@ -2496,9 +2550,8 @@ async function _standalonePlaylistParentPath(item) {
       }
     } catch (_) {}
   }
-  const webkitPath = String(item?.video?.webkitRelativePath || '');
-  if (webkitPath) return _playlistParentFromKnownPath(webkitPath);
-  return _playlistParentFromKnownPath(item?.videoPath, item?.sourceRootName);
+  const knownPath = _playlistBestKnownPath(item?.videoPath, item?.video?.webkitRelativePath);
+  return _playlistParentFromKnownPath(knownPath, item?.sourceRootName);
 }
 
 async function copyPlaylistItemParentPath(index = _playlistLocationTargetIndex()) {
@@ -2510,7 +2563,9 @@ async function copyPlaylistItemParentPath(index = _playlistLocationTargetIndex()
   const payload = {
     llt:'vp-access-copy-parent', accessId:String(item.accessId || ''),
     itemIndex:index, kind:'video', name:_playlistFileName(item, 'video'),
-    path:String(item.videoPath || ''), sourceRootName:String(item.sourceRootName || '')
+    path:_playlistBestKnownPath(item.videoPath, item.video?.webkitRelativePath),
+    relativePath:String(item.video?.webkitRelativePath || ''),
+    sourceRootName:String(item.sourceRootName || '')
   };
   if (_isEmbeddedPlaylistPlayer() && window.parent !== window) {
     try {
@@ -2836,8 +2891,7 @@ window.addEventListener('message', e => {
       _finishHostedPlaylistPermissionRequest(e.data);
     }
     else if (c === 'vp-import-progress' && e.source === parent) {
-      const status = document.getElementById('playlistImportStatus');
-      if (status) status.textContent = e.data.message || '';
+      _setPlaylistImportStatus(e.data.message || '');
     }
     else if (c === 'vp-access-import-files' && e.source === parent) {
       _applyImportedPlaylistFolder(e.data, null);
@@ -3502,6 +3556,9 @@ function loadVideo(i, preserveLoopMode = false){
   playCount = 0;
   subPlayCount = 0;
   subIndex = -1;
+  loopCueSelectionIndex = -1;
+  pendingLoopCueSeek = null;
+  loopUserSeekPending = false;
   initialSubIndex = -1;
   lastOverlaySubIndex = -1;
   transCurrentText = '';
@@ -3565,7 +3622,10 @@ function loadVideo(i, preserveLoopMode = false){
           // loopMode 유지 시: 새 영상의 첫 자막부터 반복 재시작
           subIndex = 0;
           initialSubIndex = 0;
-          video.currentTime = Math.max(subtitles[0].start - startMargin, 0);
+          const loopSeekTarget = Math.max(subtitles[0].start - startMargin, 0);
+          setLoopCueSelection(0);
+          markLoopCueSeek(0, loopSeekTarget);
+          video.currentTime = loopSeekTarget;
           updateLoopStatus();
         } else if(!restoredVideoOptions && !preserveLoopMode && subtitles.length > 0){
           // 새 영상은 첫 자막부터, 복원 영상은 현재 재생 시각의 자막부터 반복한다.
@@ -3573,6 +3633,7 @@ function loadVideo(i, preserveLoopMode = false){
           subIndex = resumeTarget >= 0 ? resumeTarget : 0;
           initialSubIndex = subIndex;
           loopMode = 'all';
+          setLoopCueSelection(subIndex);
           playCount = 0; subPlayCount = 0;
           seqMultiplier = 1.0; applyVideoRate();
           updateLoopStatus();
@@ -3598,6 +3659,10 @@ function loadVideo(i, preserveLoopMode = false){
 }
 
 // 자막 텍스트에서 각 줄별로 {\fs} 태그를 파싱하여 크기를 적용한 HTML 반환
+function normalizeSubtitleHardSpaces(text) {
+  return String(text == null ? '' : text).replace(/\\h/g, '\u00A0');
+}
+
 function parseSubtitleWithStyles(text) {
   const lines = text.split('\n').filter(line => line.trim() !== '');
   let totalHeight = 0;
@@ -3621,6 +3686,7 @@ function parseSubtitleWithStyles(text) {
     // 모든 ASS/SSA 태그 제거
     cleanLine = cleanLine.replace(/\{\s*\\?fs\d*\s*\}/g, '');  // {\fs15}, {\fs} 형태
     cleanLine = cleanLine.replace(/\{\s*\\?[a-z]\d*\s*\}/g, ''); // {\b1}, {\i1} 등 다른 태그
+    cleanLine = normalizeSubtitleHardSpaces(cleanLine);
     cleanLine = cleanLine.trim();
     
     // 빈 줄 스킵
@@ -3738,6 +3804,8 @@ function renderSubs(){
   console.log('renderSubs() 호출됨');
   console.log('subtitles 배열:', subtitles);
   console.log('subtitles 길이:', subtitles.length);
+  manualCueSelectionIndex = -1;
+  pendingManualCueSelectionIndex = -1;
   
   subsDiv.innerHTML='';
   const timelineContainer = document.getElementById('subtitleTimeline');
@@ -3817,15 +3885,16 @@ function renderSubs(){
     });
     
     d.onclick=()=>{
-      subIndex=i;
-      video.currentTime=s.start;
+      const selectedSub = selectSubtitleManually(i);
+      if (!selectedSub) return;
+      if (loopMode === 'sub' || loopMode === 'all') updateLoopStatus();
       
       if(video.paused) {
         // 정지 상태: 해당 자막 재생 후 정지
         video.play();
         isPlayingSubtitle = true;
         playingSubtitleIndex = i;
-        playingSubtitleEnd = s.end;
+        playingSubtitleEnd = selectedSub.end;
       } else {
         // 재생 중: 해당 자막으로 이동하고 계속 재생 (정지하지 않음)
         isPlayingSubtitle = false;
@@ -3850,32 +3919,30 @@ function renderSubs(){
       const block = document.createElement('div');
       block.className = 'subtitle-timeline-block';
       block.style.left = startPercent + '%';
-      block.style.width = Math.max(widthPercent, 0.4) + '%'; // 최소 너비 (인접 자막 시각적 겹침 방지)
+      block.style.width = Math.max(widthPercent, 0.4) + '%'; // 짧은 구간도 클릭 가능하도록 최소 폭 적용
+      block.style.zIndex = String(20 + i); // 실제 겹침과 최소 폭 겹침 모두 뒤쪽 cue를 클릭 우선으로 둔다.
       
+      // 타임라인 라벨은 폰트 크기 ASS 태그만 감춘다. 원본 자막 문자열은 유지한다.
+      const timelineText = normalizeSubtitleHardSpaces(String(s.text ?? '').replace(/\{\s*\\?fs\d*\s*\}/gi, ''));
+
       // 라벨 표시 (너비가 충분할 때)
       if (widthPercent > 4) {
         const label = document.createElement('div');
         label.className = 'subtitle-timeline-label';
-        label.textContent = (i + 1) + ': ' + s.text.replace(/\n/g, ' ').substring(0, 15);
+        label.textContent = (i + 1) + ': ' + timelineText.replace(/\n/g, ' ').substring(0, 15);
         block.appendChild(label);
       }
       
       block.onclick = (e) => {
         e.stopPropagation();
-        // 사용자 명시적 클릭 — 카운터/플래그 완전 리셋 후 새로 시작
-        subIndex = i;
-        if (loopMode === 'all') initialSubIndex = i;
-        subPlayCount = 0;
-        ttsSubPlayCount = 0;
-        lastTtsPreSubIndex = -1;
-        lastTtsPostSubIndex = -1;
-        seqMultiplier = 1.0;
-        applyVideoRate();
-        video.currentTime = s.start;
+        // 직접 선택 cue를 겹침 해석보다 우선하고 이전 구간의 반복 카운터를 초기화한다.
+        const selectedSub = selectSubtitleManually(i);
+        if (!selectedSub) return;
+        if (loopMode === 'sub' || loopMode === 'all') updateLoopStatus();
         video.play();
         // TTS 옵션 ON 시 사후 TTS 스타일로 TTS 선행 재생
         if (ttsLoopEnabled && (ttsLangZh || ttsLangKo) && !inTtsPhase) {
-          triggerTtsPhase(s, () => {
+          triggerTtsPhase(selectedSub, () => {
             if (video.paused) video.play();
           });
         }
@@ -3891,16 +3958,14 @@ function renderSubs(){
         } else {
           // 해당 자막 반복 설정
           loopMode = 'sub';
-          subIndex = i;
-          subPlayCount = 0;
-          video.currentTime = s.start;
+          selectSubtitleManually(i);
           video.play();
           console.log('🔄 자막 반복 시작:', s.text.substring(0, 30));
         }
         updateLoopStatus();
       };
       
-      block.title = `${i + 1}. ${formatTime(s.start)} - ${formatTime(s.end)}\n${s.text}`;
+      block.title = `${i + 1}. ${formatTime(s.start)} - ${formatTime(s.end)}\n${timelineText}`;
       timelineInner.appendChild(block);
 
       // 오버뷰 블록 (레이블 없음, 클릭은 overview 컨테이너에서 처리)
@@ -3955,14 +4020,13 @@ function triggerSkipGap(forceJump = false) {
   if (!skipGaps || loopRewinding || inTtsPhase || subtitles.length === 0) return;
   if (!forceJump && loopMode !== 'none') return;
   const t = video.currentTime;
-  const onSub = subtitles.some(s => t >= s.start && t <= s.end);
+  const onSub = subtitles.some(s => t >= s.start && t < s.end);
   if (onSub) return;
   const next = subtitles.find(s => s.start > t + 0.01);
   if (next) {
-    loopRewinding = true;
+    beginLoopRewind(300);
     video.currentTime = Math.max(next.start - startMargin, 0);
     if (video.paused) video.play();
-    setTimeout(() => { loopRewinding = false; }, 300);
   } else {
     // 마지막 자막 이후 → 다음 영상으로 (forceJump 시 loopMode 무관)
     if ((forceJump || loopMode === 'none') && playlist.length > 0 && currentIndex < playlist.length - 1) {
@@ -4044,8 +4108,7 @@ function cyclePlaylistLoopMode() {
 function prevSub(){
   if(subtitles.length === 0) return;
   if(subIndex>0){
-    subIndex--;
-    video.currentTime=subtitles[subIndex].start;
+    selectSubtitleManually(subIndex - 1);
     // 특정자막 반복이나 전체반복 모드는 유지, 나머지는 풀기
     if (loopMode !== 'all' && loopMode !== 'sub') {
       loopMode = 'none';
@@ -4057,14 +4120,47 @@ function prevSub(){
 function nextSub(){
   if(subtitles.length === 0) return;
   if(subIndex<subtitles.length-1){
-    subIndex++;
-    video.currentTime=subtitles[subIndex].start;
+    selectSubtitleManually(subIndex + 1);
     // 특정자막 반복이나 전체반복 모드는 유지, 나머지는 풀기
     if (loopMode !== 'all' && loopMode !== 'sub') {
       loopMode = 'none';
     }
     updateLoopStatus();
   }
+}
+
+function setLoopCueSelection(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= subtitles.length) {
+    loopCueSelectionIndex = -1;
+    pendingLoopCueSeek = null;
+    return;
+  }
+  if (loopCueSelectionIndex !== index) {
+    loopAllBoundaryHandledIndex = -1;
+    if (manualCueSelectionIndex !== index) manualCueSelectionIndex = -1;
+    if (pendingManualCueSelectionIndex !== index) pendingManualCueSelectionIndex = -1;
+    if (pendingLoopCueSeek && pendingLoopCueSeek.index !== index) pendingLoopCueSeek = null;
+  }
+  loopCueSelectionIndex = index;
+}
+
+function markLoopCueSeek(index, targetTime) {
+  if ((loopMode !== 'sub' && loopMode !== 'all') ||
+      !Number.isInteger(index) || index < 0 || index >= subtitles.length ||
+      !Number.isFinite(targetTime)) return;
+  setLoopCueSelection(index);
+  pendingLoopCueSeek = Math.abs(video.currentTime - targetTime) > 0.001
+    ? { index, targetTime, awaitingSeeking: true, awaitingSeeked: false }
+    : null;
+}
+
+// 오래된 타이머가 새 rewind 보호를 일찍 풀지 못하도록 세대 번호를 묶는다.
+function beginLoopRewind(delayMs = 300) {
+  loopRewinding = true;
+  const generation = ++loopRewindReleaseGeneration;
+  setTimeout(() => {
+    if (generation === loopRewindReleaseGeneration) loopRewinding = false;
+  }, delayMs);
 }
 
 // 현재 시각에 겹쳐 있는 자막은 파일 순서상 가장 먼저 시작된 항목을 선택한다.
@@ -4074,7 +4170,8 @@ function findLoopTargetIndex() {
   if (subtitles.length === 0) return -1;
   for (let i = 0; i < subtitles.length; i++) {
     const s = subtitles[i];
-    if (video.currentTime >= s.start && video.currentTime <= s.end) {
+    // SRT 구간은 [start, end): 정확히 맞닿는 다음 cue의 시작을 이전 cue가 가로채지 않는다.
+    if (video.currentTime >= s.start && video.currentTime < s.end) {
       return i;
     }
   }
@@ -4086,10 +4183,65 @@ function findLoopTargetIndex() {
   return subtitles.length - 1;
 }
 
+function consumePendingManualCueSelection() {
+  const index = pendingManualCueSelectionIndex;
+  if (index < 0 || index >= subtitles.length) {
+    pendingManualCueSelectionIndex = -1;
+    return -1;
+  }
+  const cue = subtitles[index];
+  if (video.currentTime < cue.start || video.currentTime >= cue.end) return -1;
+  pendingManualCueSelectionIndex = -1;
+  return index;
+}
+
+function getManualCueIndexAtCurrentTime(matched) {
+  const pending = consumePendingManualCueSelection();
+  if (pending >= 0) manualCueSelectionIndex = pending;
+  const index = manualCueSelectionIndex;
+  if (index < 0 || index >= subtitles.length) return -1;
+  const cue = subtitles[index];
+  if (matched.includes(index)) return index;
+  if (loopMode === 'none' && video.currentTime >= cue.end) {
+    manualCueSelectionIndex = -1;
+  } else if ((loopMode === 'sub' || loopMode === 'all') && subIndex !== index) {
+    manualCueSelectionIndex = -1;
+  }
+  return -1;
+}
+
+function selectSubtitleManually(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= subtitles.length) return null;
+  const cue = subtitles[index];
+  if (inTtsPhase) cancelTtsPhase();
+  pendingManualCueSelectionIndex = index;
+  manualCueSelectionIndex = index;
+  subIndex = index;
+  loopAllBoundaryHandledIndex = -1;
+  if (loopMode === 'all' || loopMode === 'sub') setLoopCueSelection(index);
+  if (loopMode === 'all') initialSubIndex = index;
+  playCount = 0;
+  subPlayCount = 0;
+  ttsSubPlayCount = 0;
+  lastTtsPreSubIndex = -1;
+  lastTtsPostSubIndex = -1;
+  seqMultiplier = 1.0;
+  applyVideoRate();
+  isPlayingSubtitle = false;
+  playingSubtitleIndex = -1;
+  const alreadyAtCueStart = video.currentTime === cue.start;
+  video.currentTime = cue.start;
+  if (alreadyAtCueStart) pendingManualCueSelectionIndex = -1;
+  return cue;
+}
+
 // 특정 자막 무한 반복 (현재 시각을 포함하는 가장 앞 자막 기준) - 토글
 function loopSub(){
   if(loopMode === 'sub') {
     loopMode = 'none';
+    loopCueSelectionIndex = -1;
+    pendingLoopCueSeek = null;
+    loopUserSeekPending = false;
     subPlayCount = 0;
     ttsSubPlayCount = 0;
     if (inTtsPhase) cancelTtsPhase();
@@ -4111,6 +4263,7 @@ function loopSub(){
   subPlayCount = 0;
   ttsSubPlayCount = 0;
   loopMode='sub';
+  setLoopCueSelection(targetIndex);
   seqMultiplier = 1.0; applyVideoRate();
   // 일시정지 상태에서 호출되면 단순 옵션 설정 — seek/재생/TTS 없이 모드만 설정 (재생 재개 시 자연스럽게 작동)
   if (video.paused) {
@@ -4130,6 +4283,10 @@ function loopSub(){
 function loopAll(){
   if(loopMode === 'all') {
     loopMode = 'none';
+    loopCueSelectionIndex = -1;
+    pendingLoopCueSeek = null;
+    loopUserSeekPending = false;
+    loopAllBoundaryHandledIndex = -1;
     playCount = 0;
     subPlayCount = 0;
     ttsSubPlayCount = 0;
@@ -4151,6 +4308,8 @@ function loopAll(){
   subIndex = targetIndex;
   initialSubIndex = targetIndex; // 반복 시작 지점 저장
   loopMode='all';
+  setLoopCueSelection(targetIndex);
+  loopAllBoundaryHandledIndex = -1;
   playCount=0;
   subPlayCount=0;
   ttsSubPlayCount=0;
@@ -4179,6 +4338,9 @@ function toggleLoopRange() {
   // 구간반복 ON 시 특정자막(loopSub) 해제
   if (rangeLoopEnabled && loopMode === 'sub') {
     loopMode = 'none';
+    loopCueSelectionIndex = -1;
+    pendingLoopCueSeek = null;
+    loopUserSeekPending = false;
     subPlayCount = 0;
     seqMultiplier = 1.0; applyVideoRate();
   }
@@ -4245,9 +4407,9 @@ function isHanziChar(ch) {
 }
 
 function getCleanSubtitleLines(rawText) {
-  return String(rawText || '')
+  return normalizeSubtitleHardSpaces(String(rawText || '')
     .replace(/\{[^}]*\}/g, '')
-    .replace(/<[^>]*>/g, '')
+    .replace(/<[^>]*>/g, ''))
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean);
@@ -4326,7 +4488,7 @@ function extractSubtitleLanguageParts(rawText) {
 // {fs~} 멀티라인 자막에서 번역/사전에 쓸 중국어 텍스트 추출
 function extractChineseLineForTranslation(rawText) {
   // {fs숫자} 태그를 기준으로 줄 분리 (태그 자체는 strip)
-  const stripped = rawText.replace(/\{[^}]*\}/g, '').replace(/<[^>]*>/g, '');
+  const stripped = normalizeSubtitleHardSpaces(rawText.replace(/\{[^}]*\}/g, '').replace(/<[^>]*>/g, ''));
   const lines = stripped.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length <= 1) return stripped.trim();
 
@@ -4911,30 +5073,103 @@ function updateSubtitleScale(persist = true) {
 // 반복 중지
 function stopLoop(){
   loopMode = 'none';
+  loopCueSelectionIndex = -1;
+  pendingLoopCueSeek = null;
+  loopUserSeekPending = false;
+  loopAllBoundaryHandledIndex = -1;
   playCount = 0;
   subPlayCount = 0;
   updateLoopStatus();
   console.log('반복 중지');
 }
 
-// 타임라인 조작(seek) 시작 시 처리 — seeking 이벤트는 동기 발화라 ontimeupdate 의 inTtsPhase 가드가
-// 새 위치를 이전 자막의 .end 이상으로 보고 이전 자막 .start 로 되돌리는 것을 막을 수 있는 유일한 시점
+// 타임라인 조작(seek) 시작 시 처리 — 프로그램 seek 표식은 첫 seeking에서 끝내지 않고
+// 해당 seeked 완료까지 유지해 브라우저가 보내는 추가 seeking 이벤트가 사용자 탐색으로 오인되지 않게 한다.
 video.addEventListener('seeking', () => {
-  if (loopRewinding) return; // 프로그램에서 한 seek 는 무시
+  // seeking 시점의 currentTime은 브라우저별 키프레임/seek 갱신 타이밍에 따라 목표값과 다를 수 있다.
+  // seek 직전 표식의 시작/완료 상태로 내부 seek를 판별해 겹친 이전 cue로 재선택되는 일을 막는다.
+  const isLoopProgrammaticSeek = !!pendingLoopCueSeek &&
+    pendingLoopCueSeek.index === loopCueSelectionIndex &&
+    (pendingLoopCueSeek.awaitingSeeking === true || pendingLoopCueSeek.awaitingSeeked === true);
+  if (isLoopProgrammaticSeek) {
+    // 프로그램 seek가 도착했을 때 subIndex 만 stale이면 잠긴 cue로 복구한다.
+    subIndex = loopCueSelectionIndex;
+    pendingLoopCueSeek.awaitingSeeking = false;
+    pendingLoopCueSeek.awaitingSeeked = true;
+    loopUserSeekPending = false;
+  } else if (loopMode === 'sub' || loopMode === 'all') {
+    // 직접 탐색은 루프 cue 잠금을 해제해 사용자가 이동한 위치에서 다시 선택한다.
+    loopCueSelectionIndex = -1;
+    pendingLoopCueSeek = null;
+    loopUserSeekPending = true;
+  } else if (!loopRewinding) {
+    loopCueSelectionIndex = -1;
+    pendingLoopCueSeek = null;
+    loopUserSeekPending = false;
+  }
+  if (pendingManualCueSelectionIndex >= 0) {
+    const pendingCue = subtitles[pendingManualCueSelectionIndex];
+    const atRequestedCue = pendingCue
+      && video.currentTime >= pendingCue.start
+      && video.currentTime < pendingCue.end;
+    if (loopRewinding && !loopUserSeekPending && !atRequestedCue) return; // 이전 프로그램 seek의 이벤트
+    if (atRequestedCue) loopRewinding = false;
+    else {
+      pendingManualCueSelectionIndex = -1;
+      manualCueSelectionIndex = -1;
+    }
+  } else if (!isLoopProgrammaticSeek && (!loopRewinding || loopUserSeekPending)) {
+    // 사용자가 스크러버/기본 플레이어로 다시 seek하면 이전 직접 선택을 해제한다.
+    manualCueSelectionIndex = -1;
+  }
+  if ((loopRewinding && !loopUserSeekPending) || isLoopProgrammaticSeek) return; // 프로그램에서 한 seek 는 무시
   if (inTtsPhase) cancelTtsPhase();
 });
 
 // 타임라인 조작(seek) 완료 후 처리
 video.addEventListener('seeked', () => {
-  if (loopRewinding) return; // 프로그램에서 한 seek 는 무시
+  const isLoopProgrammaticSeek = !!pendingLoopCueSeek &&
+    pendingLoopCueSeek.index === loopCueSelectionIndex &&
+    pendingLoopCueSeek.awaitingSeeked === true &&
+    Math.abs(video.currentTime - pendingLoopCueSeek.targetTime) <= 0.25;
+  if (isLoopProgrammaticSeek) {
+    pendingLoopCueSeek = null;
+    subIndex = loopCueSelectionIndex;
+  }
+  if (loopRewinding && !loopUserSeekPending) return; // 프로그램에서 한 seek 는 무시
+  if (loopUserSeekPending) loopUserSeekPending = false;
   if (inTtsPhase) return; // TTS 진행 중 프로그램 rewind 의 stale event 가능 — 처리 안 함
+  // 수동 선택 직후 앞선 seeked가 늦게 도착해도 이전 겹침 cue로 되돌아가지 않도록 목적 cue를 유지한다.
+  const retainedManualCue = manualCueSelectionIndex >= 0 ? subtitles[manualCueSelectionIndex] : null;
+  if (retainedManualCue &&
+      (video.currentTime < retainedManualCue.start || video.currentTime >= retainedManualCue.end)) return;
   // 루프 모드 + 다른 자막으로 이동했을 때만 subIndex 재잠금 + 카운터/플래그 리셋
   // (같은 자막 내 seek 나 wrappedAfterDone 의 sub.start 복귀에는 리셋 금지 — lastTtsPreSubIndex 가 리셋되면 사전 TTS 재발화 무한루프)
+  const hadPendingManualSelection = pendingManualCueSelectionIndex >= 0;
+  const explicitlySelectedIndex = consumePendingManualCueSelection();
+  if (hadPendingManualSelection && explicitlySelectedIndex < 0) return; // 이전 seek 완료 이벤트
+  const manualCue = manualCueSelectionIndex >= 0 ? subtitles[manualCueSelectionIndex] : null;
+  const activeManualIndex = manualCue
+    && video.currentTime >= manualCue.start
+    && video.currentTime < manualCue.end
+    ? manualCueSelectionIndex
+    : -1;
+  const selectedIndex = explicitlySelectedIndex >= 0 ? explicitlySelectedIndex : activeManualIndex;
+  manualCueSelectionIndex = selectedIndex;
+  if ((loopMode === 'sub' || loopMode === 'all') &&
+      loopCueSelectionIndex >= 0 && loopCueSelectionIndex < subtitles.length) {
+    // 횟수 반복의 잠긴 cue가 기준이다. 지연 seeked가 겹치는 이전 cue로 되돌리지 못하게 한다.
+    subIndex = loopCueSelectionIndex;
+    if (skipGaps) triggerSkipGap(false);
+    return;
+  }
   if ((loopMode === 'sub' || loopMode === 'all') && subtitles.length > 0) {
-    const newIdx = findLoopTargetIndex();
+    const newIdx = selectedIndex >= 0 ? selectedIndex : findLoopTargetIndex();
     if (newIdx >= 0 && newIdx !== subIndex) {
       subIndex = newIdx;
+      setLoopCueSelection(newIdx);
       if (loopMode === 'all') initialSubIndex = newIdx;
+      playCount = 0;
       subPlayCount = 0;
       ttsSubPlayCount = 0;
       lastTtsPreSubIndex = -1;
@@ -4943,30 +5178,46 @@ video.addEventListener('seeked', () => {
       applyVideoRate();
       updateLoopStatus();
     }
+    if (subIndex >= 0) setLoopCueSelection(subIndex);
   }
   if (skipGaps) triggerSkipGap(false);
 });
 
 video.ontimeupdate=()=>{
+  // 반복 cue lock을 현재 인덱스의 기준으로 삼아 오래된 seek/event가 이전 cue 경계를 다시 실행하지 않게 한다.
+  if ((loopMode === 'sub' || loopMode === 'all') &&
+      loopCueSelectionIndex >= 0 && loopCueSelectionIndex < subtitles.length &&
+      subIndex !== loopCueSelectionIndex) {
+    subIndex = loopCueSelectionIndex;
+    if (loopAllBoundaryHandledIndex !== loopCueSelectionIndex) loopAllBoundaryHandledIndex = -1;
+  }
   // 1) 현재 시각에 매칭되는 자막들 수집 (오버랩 가능성 고려, 시간순 정렬)
   const matched = [];
   for (let i = 0; i < subtitles.length; i++) {
     const s = subtitles[i];
-    if (video.currentTime >= s.start && video.currentTime <= s.end) matched.push(i);
+    if (video.currentTime >= s.start && video.currentTime < s.end) matched.push(i);
   }
   const foundSub = matched.length > 0;
+  const manualMatchIndex = getManualCueIndexAtCurrentTime(matched);
+  const activePlaybackCueIndex = subIndex >= 0 && subIndex < subtitles.length &&
+    video.currentTime >= subtitles[subIndex].start &&
+    video.currentTime < subtitles[subIndex].end
+    ? subIndex : -1;
+  const playbackTargetIndex = manualMatchIndex >= 0
+    ? manualMatchIndex
+    : activePlaybackCueIndex >= 0 ? activePlaybackCueIndex : (matched.length ? matched[0] : -1);
   const loopLocked = (loopMode === 'sub' || loopMode === 'all') && subIndex >= 0;
 
   // 2) subIndex 갱신 정책
   //    - 루프 잠김: subIndex 유지 (오버랩 자막이 도중에 등장해도 덮어쓰지 않음)
   //    - TTS phase 중: subIndex 유지 (overlap 모드 저음량 재생 중 영상이 다음 자막 범위로 진입해도
   //      현재 사전/사후 TTS 가 끝나기 전엔 절대 자막을 바꾸지 않음)
-  //    - 비잠김 + non-TTS: 가장 먼저 시작한 자막(matched[0], 낮은 인덱스 = 진입 시점이 빠른 자막) 선택
+  //    - 비잠김 + non-TTS: 직접 선택한 cue, 아직 끝나지 않은 현재 cue, 가장 먼저 시작한 cue 순으로 선택
   //      — 오버랩 중 inner/later 자막으로 subIndex 가 갱신되면 그 자막에 대한 사전 TTS 가
   //        백투백으로 추가 발화되어 "사전 TTS 두 번 반복"으로 인식됨 → 가장 먼저 시작된 자막에 안착해
   //        오버랩 자막은 사전 TTS 대상에서 제외 (이전 자막 종료 후 자연스럽게 다음 자막으로 진입)
   if (foundSub && !loopLocked && !inTtsPhase) {
-    const target = matched[0]; // 가장 먼저 시작 = 화면에 먼저 등장한 자막 (오버랩 중 stable)
+    const target = playbackTargetIndex; // 진행 중인 자막을 끝까지 유지하고, 끝난 뒤에 겹친 다음 cue로 이동
     // subIndex 갱신은 전진(target > subIndex) 시에만 — 역행 차단
     // (사전 TTS B 의 wrappedAfterDone 이 B.start 로 seek 했을 때 그 시점이 A 의 범위 안이면
     //  matched=[A,B] → target=A 가 되어 subIndex 가 B→A 로 역행 → 사전 TTS hook 이
@@ -4992,14 +5243,16 @@ video.ontimeupdate=()=>{
 
   // 3) 오버레이/UI 표시할 자막 결정
   //    - 루프 잠김 + subIndex 의 자막 구간 안: 잠긴 자막 표시 (오버랩 자막이 가리지 않음)
-  //    - 그 외: 가장 먼저 시작한 자막(matched[0]) 표시 — subIndex 와 일관성 유지, 오버랩 중 stable
+  //    - 그 외: playbackTargetIndex 표시 — 겹치는 다음 cue가 현재 cue를 끝나기 전에 덮지 않음
   let displayIdx = -1;
   if (loopLocked && subIndex >= 0) {
     const s = subtitles[subIndex];
     if (video.currentTime >= s.start && video.currentTime <= s.end + endMargin) displayIdx = subIndex;
     else if (foundSub) displayIdx = matched[0]; // 잠긴 자막 구간 밖이면 매칭된 자막 표시 (갭/이행 중)
+  } else if (manualMatchIndex >= 0) {
+    displayIdx = manualMatchIndex;
   } else if (foundSub) {
-    displayIdx = matched[0];
+    displayIdx = playbackTargetIndex;
   }
 
   if (displayIdx >= 0 && displayIdx !== lastOverlaySubIndex) {
@@ -5066,9 +5319,10 @@ video.ontimeupdate=()=>{
   if (inTtsPhase && ttsLoopMode === 'overlap' && subIndex >= 0 && !loopRewinding) {
     const s = subtitles[subIndex];
     if (video.currentTime >= s.end + endMargin - 0.05) {
-      loopRewinding = true;
-      video.currentTime = Math.max(s.start - startMargin, 0);
-      setTimeout(() => { loopRewinding = false; }, 200);
+      const loopSeekTarget = Math.max(s.start - startMargin, 0);
+      markLoopCueSeek(subIndex, loopSeekTarget);
+      beginLoopRewind(200);
+      video.currentTime = loopSeekTarget;
     }
   }
 
@@ -5101,7 +5355,7 @@ video.ontimeupdate=()=>{
   // 특정 자막 무한 반복 로직
   if(loopMode === 'sub' && subIndex >= 0 && !dfNavigating && !inTtsPhase && !loopRewinding){
     const currentSub = subtitles[subIndex];
-    if(video.currentTime >= currentSub.end + endMargin - 0.1){
+    if(video.currentTime >= currentSub.end + endMargin){
       subPlayCount++;
       ttsSubPlayCount++;
 
@@ -5116,36 +5370,49 @@ video.ontimeupdate=()=>{
           triggerTtsPhase(currentSub, () => {
             subPlayCount = 0;
             seqMultiplier = 1.0; applyVideoRate();
-            loopRewinding = true;
-            video.currentTime = Math.max(currentSub.start - startMargin, 0);
+            const loopSeekTarget = Math.max(currentSub.start - startMargin, 0);
+            markLoopCueSeek(subIndex, loopSeekTarget);
+            beginLoopRewind(300);
+            video.currentTime = loopSeekTarget;
             video.play();
-            setTimeout(() => { loopRewinding = false; }, 300);
           });
           return;
         }
       }
 
       // 일반 되감기
-      loopRewinding = true;
-      video.currentTime = Math.max(currentSub.start - startMargin, 0);
+      const loopSeekTarget = Math.max(currentSub.start - startMargin, 0);
+      markLoopCueSeek(subIndex, loopSeekTarget);
+      beginLoopRewind(300);
+      video.currentTime = loopSeekTarget;
       if(sequentialSlowdownEnabled) { seqMultiplier = getSeqMultiplier(subPlayCount); applyVideoRate(); }
       video.play();
-      setTimeout(() => { loopRewinding = false; }, 300);
     }
   }
 
   // 횟수 구간 반복 전체재생 로직
+  if (loopMode !== 'all') {
+    loopAllBoundaryHandledIndex = -1;
+  } else if (subIndex >= 0 && subIndex < subtitles.length &&
+      loopAllBoundaryHandledIndex === subIndex &&
+      video.currentTime < subtitles[subIndex].end + endMargin) {
+    // 되감기가 실제로 cue 종료 경계 아래로 돌아온 뒤에만 다음 pass 종료를 허용한다.
+    loopAllBoundaryHandledIndex = -1;
+  }
   if(loopMode === 'all' && subIndex >= 0 && !dfNavigating && !inTtsPhase && !loopRewinding){
     const currentSub = subtitles[subIndex];
-    if(video.currentTime >= currentSub.end + endMargin - 0.1){
+    if(video.currentTime >= currentSub.end + endMargin && loopAllBoundaryHandledIndex !== subIndex){
+      // 같은 cue의 종료 timeupdate가 여러 번 와도 pass 횟수는 한 번만 처리한다.
+      loopAllBoundaryHandledIndex = subIndex;
       if(subPlayCount < repeatTimes - 1){
         // 아직 반복할 횟수가 남음
         subPlayCount++;
-        loopRewinding = true;
-        video.currentTime = Math.max(currentSub.start - startMargin, 0);
+        beginLoopRewind(300);
+        const loopSeekTarget = Math.max(currentSub.start - startMargin, 0);
+        markLoopCueSeek(subIndex, loopSeekTarget);
+        video.currentTime = loopSeekTarget;
         if(sequentialSlowdownEnabled) { seqMultiplier = getSeqMultiplier(subPlayCount); applyVideoRate(); }
         video.play();
-        setTimeout(() => { loopRewinding = false; }, 300);
         updateLoopStatus();
       } else {
         // 이 자막의 반복 완료 — 다음 자막에서 사전 TTS 재발화 (자막마다 pre + sub*N + post)
@@ -5155,6 +5422,7 @@ video.ontimeupdate=()=>{
           seqMultiplier = 1.0; applyVideoRate();
           if(subIndex < subtitles.length - 1){
             subIndex++;
+            setLoopCueSelection(subIndex);
             // 새 자막으로 진입 — 사전/사후 TTS 발화 플래그 리셋 (forEach hook 이 진입 시 사전 TTS 발화)
             lastTtsPreSubIndex = -1;
             lastTtsPostSubIndex = -1;
@@ -5222,9 +5490,9 @@ video.ontimeupdate=()=>{
   // 구간 반복 로직 (loopMode와 독립, 재생 중일 때만)
   if (rangeLoopEnabled && rangeStart !== null && rangeEnd !== null && !dfNavigating && !video.paused) {
     if (video.currentTime >= rangeEnd) {
-      loopRewinding = true;
+      markLoopCueSeek(subIndex, rangeStart);
+      beginLoopRewind(300);
       video.currentTime = rangeStart;
-      setTimeout(() => { loopRewinding = false; }, 300);
     }
   }
 };
@@ -5663,6 +5931,7 @@ function _applyPendingVideoLoopSnapshot(item) {
     const target = findLoopTargetIndex();
     if (target >= 0) {
       subIndex = target;
+      setLoopCueSelection(target);
       if (loopMode === 'all') initialSubIndex = target;
     }
   }
@@ -5947,7 +6216,10 @@ function applyPendingLayout() {
   setFlex('translationPanel', L.transH);
   setFlex('charDictPanel',    L.dictH);
   setFlex('controlsSection',  L.controlsH);
-  setFlex('playlistSection',  L.playlistH);
+  // 예전 기본 높이만 70vh로 옮기고, 사용자가 리사이즈해 저장한 값은 그대로 복원한다.
+  const savedPlaylistFlex = String(L.playlistH || '').trim().replace(/\s+/g, ' ');
+  setFlex('playlistSection',
+    savedPlaylistFlex === '0 0 50vh' ? '0 0 70vh' : L.playlistH);
   setFlex('subsSection',      L.subsH);
   setFlex('editorSection',    L.editorH);
   if (L.leftPanelW) { const lp = document.getElementById('leftPanel'); if (lp) lp.style.flex = L.leftPanelW; }
@@ -6145,7 +6417,7 @@ async function ensureKoTranslationForSub(sub) {
 
 // 자막 줄을 정리한 배열 반환 (3줄 형식 감지에 사용)
 function getCleanedSubLines(sub) {
-  const cleaned = sub.text.replace(/<[^>]*>/g, '').replace(/\{\\?fs\d*\}/g, '').trim();
+  const cleaned = normalizeSubtitleHardSpaces(sub.text.replace(/<[^>]*>/g, '').replace(/\{\\?fs\d*\}/g, '')).trim();
   return cleaned.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 }
 
@@ -6172,7 +6444,7 @@ async function resolveKoTtsText(sub, rawText) {
 // 한국어가 필요하지만 자막에 한글이 없으면 웹 번역(gtrans) 으로 비동기 fetch (캐시됨)
 async function buildTtsList(sub, order, zhRepeat, zhEnabled, koEnabled) {
   // 자막 텍스트에서 직접 중국어 추출 (DOM 비동기 갱신으로 이전 자막이 남는 문제 회피)
-  const rawText = sub.text.replace(/<[^>]*>/g, '').replace(/\{\\?fs\d*\}/g, '').replace(/\n/g, ' ').trim();
+  const rawText = normalizeSubtitleHardSpaces(sub.text.replace(/<[^>]*>/g, '').replace(/\{\\?fs\d*\}/g, '')).replace(/\n/g, ' ').trim();
   const zhText = extractChineseLineForTranslation(sub.text);
 
   const zhItem = { text: (zhText && zhText.length > 0) ? zhText : rawText, lang: 'zh-CN' };
@@ -6271,10 +6543,11 @@ async function triggerPreTtsPhase(sub, afterDone) {
   updateTtsUI();
   if (ttsLoopMode === 'overlap') {
     applyMainVolume(); // inTtsPhase=true 상태이므로 덕킹(10%) 적용
-    loopRewinding = true;
-    video.currentTime = Math.max(sub.start - startMargin, 0);
+    const loopSeekTarget = Math.max(sub.start - startMargin, 0);
+    markLoopCueSeek(subtitles.indexOf(sub), loopSeekTarget);
+    beginLoopRewind(300);
+    video.currentTime = loopSeekTarget;
     video.play();
-    setTimeout(() => { loopRewinding = false; }, 300);
   } else {
     _ttsInitiatedPause = true; video.pause(); setTimeout(() => { _ttsInitiatedPause = false; }, 30);
     showTimeDisplay('🔊 사전 TTS 재생 중...', 8000);
@@ -6297,10 +6570,11 @@ async function triggerPreTtsPhase(sub, afterDone) {
     if (subIndex < 0) { afterDone(); return; }
     const currentSub = subtitles[subIndex];
     if (!currentSub) { afterDone(); return; }
-    loopRewinding = true;
-    video.currentTime = Math.max(currentSub.start - startMargin, 0);
+    const loopSeekTarget = Math.max(currentSub.start - startMargin, 0);
+    markLoopCueSeek(subIndex, loopSeekTarget);
+    beginLoopRewind(300);
+    video.currentTime = loopSeekTarget;
     video.play();
-    setTimeout(() => { loopRewinding = false; }, 300);
     afterDone();
   };
 
@@ -6309,17 +6583,21 @@ async function triggerPreTtsPhase(sub, afterDone) {
 
 // 루프 자막 재생 시작 헬퍼 — 사전 TTS 활성 시 사전 페이즈 거쳐 자막 재생, 비활성 시 직접 재생
 function startLoopSubPlayback(sub) {
+  const targetIndex = subtitles.indexOf(sub);
+  if (targetIndex >= 0) {
+    subIndex = targetIndex;
+  }
   if (ttsLoopEnabled && (ttsPreLangZh || ttsPreLangKo)) {
     // 이 자막에 대한 사전 TTS 가 이미 발화됨을 표시 (ontimeupdate hook 중복 발화 방지)
-    const idx = subtitles.indexOf(sub);
-    if (idx >= 0) lastTtsPreSubIndex = idx;
+    if (targetIndex >= 0) lastTtsPreSubIndex = targetIndex;
     // 사전 TTS 가 wrappedAfterDone 에서 자막 시작 위치로 seek + 재생까지 처리
     triggerPreTtsPhase(sub, () => {});
   } else {
-    loopRewinding = true;
-    video.currentTime = Math.max(sub.start - startMargin, 0);
+    beginLoopRewind(300);
+    const loopSeekTarget = Math.max(sub.start - startMargin, 0);
+    markLoopCueSeek(targetIndex, loopSeekTarget);
+    video.currentTime = loopSeekTarget;
     video.play();
-    setTimeout(() => { loopRewinding = false; }, 300);
   }
 }
 
@@ -6332,10 +6610,11 @@ async function triggerTtsPhase(sub, afterTts) {
   updateTtsUI();
   if (ttsLoopMode === 'overlap') {
     applyMainVolume(); // inTtsPhase=true 상태이므로 덕킹(10%) 적용
-    loopRewinding = true;
-    video.currentTime = Math.max(sub.start - startMargin, 0);
+    const loopSeekTarget = Math.max(sub.start - startMargin, 0);
+    markLoopCueSeek(subtitles.indexOf(sub), loopSeekTarget);
+    beginLoopRewind(300);
+    video.currentTime = loopSeekTarget;
     video.play();
-    setTimeout(() => { loopRewinding = false; }, 300);
   } else {
     _ttsInitiatedPause = true; video.pause(); setTimeout(() => { _ttsInitiatedPause = false; }, 30);
     showTimeDisplay('🔊 TTS 재생 중...', 8000);
@@ -6358,10 +6637,11 @@ async function triggerTtsPhase(sub, afterTts) {
       if (subIndex < 0) { afterTts(); return; }
       const currentSub = subtitles[subIndex];
       if (!currentSub) { afterTts(); return; }
-      loopRewinding = true;
-      video.currentTime = Math.min(currentSub.end + endMargin + 0.05, video.duration);
+      const loopSeekTarget = Math.min(currentSub.end + endMargin + 0.05, video.duration);
+      markLoopCueSeek(subIndex, loopSeekTarget);
+      beginLoopRewind(300);
+      video.currentTime = loopSeekTarget;
       video.play();
-      setTimeout(() => { loopRewinding = false; }, 300);
     }
     afterTts();
   };
@@ -6911,8 +7191,7 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
   clearTimeout(playlistHostSnapshotTimer);
   playlistHostSnapshotPending = false;
   const records = Array.isArray(payload?.records) ? payload.records : [];
-  const importStatus = document.getElementById('playlistImportStatus');
-  if (importStatus) importStatus.textContent = payload?.storageWarning || '파일 수신 완료 · 목록에 추가 중…';
+  _setPlaylistImportStatus(payload?.storageWarning || '파일 수신 완료 · 목록에 추가 중…');
   const imported = records
     .filter(record => record && record.videoFile)
     .map(record => ({
@@ -6996,7 +7275,7 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
     addedCount ? `새 항목 ${addedCount}개 추가` : '',
     imported.some(item => item.srt) ? 'SRT 자동 연결' : ''
   ].filter(Boolean).join(' · ');
-  if (importStatus) importStatus.textContent = payload?.storageWarning || '';
+  _setPlaylistImportStatus(payload?.storageWarning || '');
   hideTimeDisplay();
   _updatePlaylistPermissionUI();
   return true;
@@ -7020,8 +7299,7 @@ function _handleBrokeredPlaylistError(message) {
   playlistPermissionBusy = false;
   playlistPickerBusy = false;
   _updatePlaylistPermissionUI();
-  const status = document.getElementById('playlistImportStatus');
-  if (status) status.textContent = message || '파일 불러오기 실패';
+  _setPlaylistImportStatus(message || '파일 불러오기 실패');
   showTimeDisplay(`⚠ ${message || '메인 화면에서 폴더를 연결하지 못했습니다.'}`, 7000);
 }
 
@@ -7627,20 +7905,48 @@ function movePlaylistItemDown() {
 const VIDEO_EXT = /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|mpg|mpeg|3gp|mts|m2ts|mxf)$/i;
 
 // 파일 선택 폴백의 webkitRelativePath에서 폴더 내 상대경로를 보존한다.
-function _playlistInputFileLocation(file){
-  const full = String(file?.webkitRelativePath || '').replace(/\\/g, '/');
+function _playlistInputFileLocation(file) {
+  const full = String(file?._dropRelativePath || file?.webkitRelativePath || '').replace(/\\/g, '/');
   const parts = full.split('/').filter(Boolean);
   if (parts.length < 2) return { path:file?.name || '', root:'', dir:'' };
   const relative = parts.slice(1);
   return { path:relative.join('/'), root:parts[0], dir:relative.slice(0,-1).join('/') };
 }
+function _dropPathKey(value) {
+  return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').normalize('NFKC').toLocaleLowerCase();
+}
+function _dropFileHandlePath(file) {
+  const location = _playlistInputFileLocation(file);
+  return [location.root, location.path].filter(Boolean).join('/') || file?.name || '';
+}
+function _registerDropFileHandle(handleMap, file, handle, relativePath) {
+  if (!handleMap || !file || !handle) return;
+  const path = String(relativePath || file.name || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  try { Object.defineProperty(file, '_dropRelativePath', { value:path, configurable:true }); }
+  catch (_) { try { file._dropRelativePath = path; } catch (_) {} }
+  const pathKey = _dropPathKey(path);
+  if (pathKey) handleMap.set('path:' + pathKey, handle);
+  const nameKey = 'name:' + _dropPathKey(file.name);
+  if (!handleMap.has(nameKey)) handleMap.set(nameKey, handle);
+  else if (handleMap.get(nameKey) !== handle) handleMap.set(nameKey, null);
+}
+function _findDropFileHandle(handleMap, file) {
+  if (!handleMap || !file) return null;
+  const pathKey = _dropPathKey(_dropFileHandlePath(file));
+  const pathHandle = pathKey ? handleMap.get('path:' + pathKey) : null;
+  if (pathHandle) return pathHandle;
+  const nameHandle = handleMap.get('name:' + _dropPathKey(file.name));
+  return nameHandle || handleMap.get(file.name) || null;
+}
 
 // File[] 배열에서 video+srt 매칭 후 플레이리스트에 추가
-function addFilesToPlaylist(files, autoPlay, handleMap = new Map()) {
-  const videoFiles = files.filter(f => VIDEO_EXT.test(f.name));
-  const srtFiles   = files.filter(f => f.name.toLowerCase().endsWith('.srt'));
-  if (videoFiles.length === 0) return;
+// dropOptions는 드래그 전용 동작만 제어해 파일/폴더 선택 버튼 흐름과 분리한다.
+function addFilesToPlaylist(files, autoPlay, handleMap = new Map(), dropOptions = null) {
+  const videoFiles = Array.from(files || []).filter(f => f && VIDEO_EXT.test(f.name || ''));
+  const srtFiles = Array.from(files || []).filter(f => f && /\.srt$/i.test(f.name || ''));
+  if (videoFiles.length === 0) return 0;
 
+  const wasEmpty = playlist.length === 0;
   const startIndex = playlist.length;
   const imported = [];
   videoFiles.forEach(vf => {
@@ -7659,104 +7965,188 @@ function addFilesToPlaylist(files, autoPlay, handleMap = new Map()) {
     const srtLoc = srt ? _playlistInputFileLocation(srt) : { path:'', root:'', dir:'' };
     imported.push({
       accessId:_newPlaylistAccessId(), hostAccess:false,
-      video: vf, srt,
-      videoHandle: handleMap.get(vf.name) || null,
-      srtHandle:   srt ? (handleMap.get(srt.name) || null) : null,
+      video:vf, srt,
+      videoHandle:_findDropFileHandle(handleMap, vf),
+      srtHandle:srt ? _findDropFileHandle(handleMap, srt) : null,
       videoPath:videoLoc.path || vf.name || '', sourceRootName:videoLoc.root || '',
       srtPath:srt ? (srtLoc.path || srt.name || '') : '',
       placeholderVideoName:vf.name || '', placeholderSrtName:srt?.name || '',
       videoAccessStatus:'ready', srtAccessStatus:srt ? 'ready' : 'none',
       videoMissing:false, srtMissing:false, needsPermission:false, needsSrtPermission:false
     });
-    if (srt) console.log(`SRT 매칭: ${vf.name} ← ${srt.name}`);
+    if (srt) console.log('SRT 매칭: ' + vf.name + ' ← ' + srt.name);
   });
-  const merged = _mergeImportedPlaylistItems(imported);
-  renderPlaylist();
-  if (startIndex === 0 && playlist.length > 0) {
-    // 빈 목록에서 추가된 경우 → 최상단 자동재생
-    currentIndex = 0;
-    loadVideo(0);
-    video.play();
-  } else if (autoPlay) {
-    const targetIndex = merged.relinkedIndices[0] ?? (merged.addedCount ? playlist.length - merged.addedCount : -1);
-    if (targetIndex >= 0 && loadVideo(targetIndex) !== false) video.play();
+
+  let targetIndex = -1;
+  const mode = dropOptions?.mode || '';
+  if (mode === 'replace') {
+    _clearPlaylistState();
+    playlist = imported;
+    currentIndex = -1;
+    targetIndex = 0;
+  } else if (mode === 'insert') {
+    const at = Math.max(0, Math.min(Number.isInteger(dropOptions.index) ? dropOptions.index : playlist.length, playlist.length));
+    const currentItem = playlist[currentIndex] || null;
+    const oldSelection = Array.from(selectedIndices);
+    const oldFocus = playlistFocusIndex;
+    playlist.splice(at, 0, ...imported);
+    if (currentItem) currentIndex = playlist.indexOf(currentItem);
+    else if (currentIndex >= at) currentIndex += imported.length;
+    selectedIndices.clear();
+    oldSelection.forEach(index => selectedIndices.add(index >= at ? index + imported.length : index));
+    lastSelectedIndex = lastSelectedIndex >= at ? lastSelectedIndex + imported.length : lastSelectedIndex;
+    playlistFocusIndex = oldFocus >= at ? oldFocus + imported.length : oldFocus;
+    targetIndex = at;
+  } else {
+    const merged = _mergeImportedPlaylistItems(imported);
+    targetIndex = merged.relinkedIndices[0] ?? (merged.addedCount ? playlist.length - merged.addedCount : -1);
   }
+
+  renderPlaylist();
+  const shouldAutoPlay = mode === 'replace' || !!autoPlay || wasEmpty;
+  if (shouldAutoPlay && targetIndex >= 0 && targetIndex < playlist.length) {
+    currentIndex = targetIndex;
+    if (loadVideo(targetIndex) !== false) {
+      const playRequest = video.play();
+      if (playRequest && typeof playRequest.catch === 'function') playRequest.catch(() => {});
+    }
+  }
+  if (dropOptions) void _savePlaylistToDB();
+  return imported.length;
 }
 
-// FileSystemEntry 재귀 → File[] 수집 (폴더 포함)
+// FileSystemEntry 재귀 → 지원 영상·SRT만 수집하고 폴더 상대경로를 보존한다.
 async function collectFilesFromEntries(entries) {
   const files = [];
   async function walk(entry) {
     if (entry.isFile) {
-      await new Promise(res => entry.file(f => { files.push(f); res(); }, res));
-    } else if (entry.isDirectory) {
-      const reader = entry.createReader();
-      await new Promise(res => {
-        function batch() {
-          reader.readEntries(async children => {
-            if (!children.length) { res(); return; }
-            for (const c of children) await walk(c);
-            batch();
-          }, res);
-        }
-        batch();
-      });
+      const file = await new Promise(resolve => entry.file(resolve, () => resolve(null)));
+      if (!file || (!VIDEO_EXT.test(file.name || '') && !/\.srt$/i.test(file.name || ''))) return;
+      const relativePath = String(entry.fullPath || entry.name || file.name).replace(/^\/+/, '');
+      try { Object.defineProperty(file, '_dropRelativePath', { value:relativePath, configurable:true }); }
+      catch (_) { try { file._dropRelativePath = relativePath; } catch (_) {} }
+      files.push(file);
+      return;
+    }
+    if (!entry.isDirectory) return;
+    const reader = entry.createReader();
+    while (true) {
+      const batch = await new Promise(resolve => reader.readEntries(resolve, () => resolve([])));
+      if (!batch.length) break;
+      for (const child of batch) await walk(child);
     }
   }
-  for (const e of entries) await walk(e);
+  for (const entry of entries || []) await walk(entry);
+  return files;
+}
+
+async function collectFilesFromFileSystemHandle(handle, handleMap) {
+  const files = [];
+  async function walk(node, relativePath) {
+    if (node.kind === 'file') {
+      if (!VIDEO_EXT.test(node.name || '') && !/\.srt$/i.test(node.name || '')) return;
+      try {
+        const file = await node.getFile();
+        const filePath = relativePath || node.name;
+        _registerDropFileHandle(handleMap, file, node, filePath);
+        files.push(file);
+      } catch (_) {}
+      return;
+    }
+    if (node.kind !== 'directory' || typeof node.entries !== 'function') {
+      throw new Error('Unsupported dropped file handle');
+    }
+    const directoryPath = relativePath || node.name;
+    for await (const [name, child] of node.entries()) {
+      await walk(child, [directoryPath, name].filter(Boolean).join('/'));
+    }
+  }
+  await walk(handle, '');
   return files;
 }
 
 // ===== 드래그앤드롭 초기화 =====
 function initDragDrop() {
-  // 브라우저 기본 파일 열기 방지
-  document.addEventListener('dragover', e => e.preventDefault());
-  document.addEventListener('drop',     e => e.preventDefault());
+  if (initDragDrop._bound) return;
+  initDragDrop._bound = true;
 
-  async function handleDrop(e, autoPlay) {
+  function hasFilePayload(e) {
+    const transfer = e?.dataTransfer;
+    if (!transfer) return false;
+    try { if (Array.from(transfer.types || []).includes('Files')) return true; } catch (_) {}
+    try { if (Array.from(transfer.items || []).some(item => item.kind === 'file')) return true; } catch (_) {}
+    try { if (transfer.files && transfer.files.length) return true; } catch (_) {}
+    return false;
+  }
+  const preventFileNavigation = e => { if (hasFilePayload(e)) e.preventDefault(); };
+  window.addEventListener('dragover', preventFileNavigation, true);
+  window.addEventListener('drop', preventFileNavigation, true);
+
+  async function handleDrop(e, options) {
     e.preventDefault();
-    const entries  = [];
-    const handleMap = new Map(); // 파일명 → FileSystemFileHandle
-    if (e.dataTransfer.items) {
-      for (const item of e.dataTransfer.items) {
-        if (item.kind !== 'file') continue;
-        // FSA 핸들 수집 (단일 파일만 — 폴더는 엔트리 방식 사용)
-        if (item.getAsFileSystemHandle) {
-          try {
-            const h = await item.getAsFileSystemHandle();
-            if (h && h.kind === 'file') handleMap.set(h.name, h);
-          } catch(_) {}
-        }
-        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
-        if (entry) entries.push(entry);
+    if (!hasFilePayload(e)) return;
+    const transfer = e.dataTransfer;
+    const handleMap = new Map();
+    const fallbackFiles = Array.from(transfer.files || []);
+    const records = [];
+    for (const item of Array.from(transfer.items || [])) {
+      if (item.kind !== 'file') continue;
+      let handlePromise = null;
+      if (typeof item.getAsFileSystemHandle === 'function') {
+        try { handlePromise = Promise.resolve(item.getAsFileSystemHandle()).catch(() => null); }
+        catch (_) {}
       }
+      let entry = null;
+      try { if (item.webkitGetAsEntry) entry = item.webkitGetAsEntry(); } catch (_) {}
+      let file = null;
+      try { if (item.getAsFile) file = item.getAsFile(); } catch (_) {}
+      records.push({ handlePromise, entry, file });
     }
-    const files = entries.length > 0
-      ? await collectFilesFromEntries(entries)
-      : Array.from(e.dataTransfer.files);
-    addFilesToPlaylist(files, autoPlay, handleMap);
+
+    const files = [];
+    for (const record of records) {
+      let handle = null;
+      if (record.handlePromise) {
+        try { handle = await record.handlePromise; } catch (_) {}
+      }
+      if (handle) {
+        try {
+          const handledFiles = await collectFilesFromFileSystemHandle(handle, handleMap);
+          files.push(...handledFiles);
+          if (handledFiles.length || !record.entry) continue;
+        } catch (_) {}
+      }
+      if (record.entry) {
+        try { files.push(...await collectFilesFromEntries([record.entry])); continue; } catch (_) {}
+      }
+      if (record.file) files.push(record.file);
+    }
+    if (!files.length && fallbackFiles.length) files.push(...fallbackFiles);
+    const importedCount = addFilesToPlaylist(files, !!options?.autoPlay, handleMap, options);
+    if (!importedCount) showTimeDisplay('드롭한 항목에서 지원하는 영상 파일을 찾지 못했습니다.', 4500);
   }
 
-  // videoContainer: 드래그 중 <video> pointer-events를 none으로 직접 차단
-  // (overlay 전환 타이밍 불안정 문제 해소)
   const vc = document.getElementById('videoContainer');
+  const videoEl = vc?.querySelector('video');
+  const ps = document.getElementById('playlistSection');
+  const list = document.getElementById('playlist');
+
+  function enableDragMode() { if (videoEl) videoEl.style.pointerEvents = 'none'; }
+  function disableDragMode() { if (videoEl) videoEl.style.pointerEvents = ''; }
+  function resetDropStyle() {
+    if (vc) { vc.style.borderColor = '#666'; vc.style.backgroundColor = '#000'; }
+    if (ps) { ps.style.borderColor = '#666'; ps.style.backgroundColor = '#0a0a0a'; }
+    disableDragMode();
+  }
+
+  window.addEventListener('dragenter', e => { if (hasFilePayload(e)) enableDragMode(); }, true);
+  window.addEventListener('dragleave', e => { if (hasFilePayload(e) && !e.relatedTarget) disableDragMode(); }, true);
+  window.addEventListener('drop', resetDropStyle, true);
+  window.addEventListener('dragend', resetDropStyle, true);
+
   if (vc) {
-    const videoEl = vc.querySelector('video');
-
-    function enableDragMode() {
-      if (videoEl) videoEl.style.pointerEvents = 'none';
-    }
-    function disableDragMode() {
-      if (videoEl) videoEl.style.pointerEvents = '';
-    }
-
-    document.addEventListener('dragenter', enableDragMode);
-    document.addEventListener('dragleave', e => {
-      if (!e.relatedTarget) disableDragMode(); // 창 밖으로 나갔을 때만
-    });
-    document.addEventListener('drop', disableDragMode);
-
     vc.addEventListener('dragover', e => {
+      if (!hasFilePayload(e)) return;
       e.preventDefault();
       vc.style.borderColor = '#1976d2';
       vc.style.backgroundColor = '#1a1a1a';
@@ -7768,17 +8158,14 @@ function initDragDrop() {
       }
     });
     vc.addEventListener('drop', async e => {
-      vc.style.borderColor = '#666';
-      vc.style.backgroundColor = '#000';
-      disableDragMode();
-      await handleDrop(e, true);
+      resetDropStyle();
+      await handleDrop(e, { mode:'append', autoPlay:true });
     });
   }
 
-  // 플레이리스트 섹션
-  const ps = document.getElementById('playlistSection');
   if (ps) {
     ps.addEventListener('dragover', e => {
+      if (!hasFilePayload(e)) return;
       e.preventDefault();
       ps.style.borderColor = '#1976d2';
       ps.style.backgroundColor = '#1a1a1a';
@@ -7790,15 +8177,21 @@ function initDragDrop() {
       }
     });
     ps.addEventListener('drop', async e => {
-      ps.style.borderColor = '#666';
-      ps.style.backgroundColor = '#0a0a0a';
-      await handleDrop(e, false);
+      resetDropStyle();
+      if (list && list.contains(e.target)) {
+        const row = e.target.closest?.('#playlist .item');
+        const index = row
+          ? Math.max(0, Number(row.dataset.playlistIndex) + (e.clientY >= row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2 ? 1 : 0))
+          : playlist.length;
+        await handleDrop(e, { mode:'insert', index, autoPlay:false });
+      } else {
+        await handleDrop(e, { mode:'replace', autoPlay:true });
+      }
     });
   }
 
   console.log('✅ 드래그앤드롭 초기화 완료');
 }
-
 // ==== 구버전 잔재 제거됨 ====
 async function findSiblingInDirectory(videoEntry) {
   return new Promise((resolve) => {
@@ -8006,10 +8399,9 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if(subtitles.length === 0) return;
     if(subIndex > 0) {
-      subIndex--;
-      video.currentTime = subtitles[subIndex].start;
+      const selectedSub = selectSubtitleManually(subIndex - 1);
       if(loopMode === 'sub') { video.play(); }
-      else { video.play(); isPlayingSubtitle=true; playingSubtitleIndex=subIndex; playingSubtitleEnd=subtitles[subIndex].end; }
+      else if (selectedSub) { video.play(); isPlayingSubtitle=true; playingSubtitleIndex=subIndex; playingSubtitleEnd=selectedSub.end; }
       updateLoopStatus();
     }
   }
@@ -8017,10 +8409,9 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if(subtitles.length === 0) return;
     if(subIndex < subtitles.length - 1) {
-      subIndex++;
-      video.currentTime = subtitles[subIndex].start;
+      const selectedSub = selectSubtitleManually(subIndex + 1);
       if(loopMode === 'sub') { video.play(); }
-      else { video.play(); isPlayingSubtitle=true; playingSubtitleIndex=subIndex; playingSubtitleEnd=subtitles[subIndex].end; }
+      else if (selectedSub) { video.play(); isPlayingSubtitle=true; playingSubtitleIndex=subIndex; playingSubtitleEnd=selectedSub.end; }
       updateLoopStatus();
     }
   }
@@ -9263,8 +9654,7 @@ function _openPlaylistInputFallback(folder, message){
     input.setAttribute('directory', '');
     input.dataset.folderPicker = '1';
   }
-  const status = document.getElementById('playlistImportStatus');
-  if (status) status.textContent = message || '브라우저 기본 선택창으로 전환했습니다. 이 폴백은 새로고침 뒤 다시 선택해야 합니다.';
+  _setPlaylistImportStatus(message || '브라우저 기본 선택창으로 전환했습니다. 임시 가져오기는 새로고침 뒤 다시 선택해야 합니다.');
   input.click();
   return true;
 }
@@ -9274,7 +9664,9 @@ function _openPlaylistInputFallback(folder, message){
 async function openPlaylistFolderFSA(replaceExisting = false) {
   if (playlistPickerBusy) return false;
 
-  const immediateStartHandle = playlistLastPickerHandle || playlistRootHandle || _playlistRootStartHandle() || null;
+  const savedRootStartHandle = _playlistRootStartHandle();
+  const immediateStartHandle = [playlistLastPickerHandle, playlistRootHandle, savedRootStartHandle]
+    .find(handle => handle?.kind === 'directory') || null;
   const payload = {
     llt:'vp-folder-import', replace:replaceExisting === true, autoPlay:true,
     playlistLength:replaceExisting === true ? 0 : playlist.length
@@ -9282,26 +9674,36 @@ async function openPlaylistFolderFSA(replaceExisting = false) {
 
   if (_isEmbeddedPlaylistPlayer() && window.parent !== window) {
     if (!_vpParentPickerCanStart('folder')) return _openPlaylistInputFallback(true, '폴더 선택기를 엽니다. 이 폴백은 새로고침 뒤 다시 선택해야 합니다.');
-    playlistPickerBusy = true;
-    _updatePlaylistPermissionUI();
     let calledDirectly = false;
+    let pickerRequest = null;
     try {
       if (parent && typeof parent.vpFolderHostImportFromPlayer === 'function') {
+        // 선택기는 신뢰된 클릭 처리 중에 먼저 시작한다. 누른 버튼을 disabled로
+        // 바꾼 뒤 호출하면 브라우저가 사용자 활성화를 잃어 선택기를 차단할 수 있다.
+        pickerRequest = parent.vpFolderHostImportFromPlayer(payload, immediateStartHandle);
         calledDirectly = true;
-        const started = await parent.vpFolderHostImportFromPlayer(payload, immediateStartHandle);
-        if (!started) {
-          playlistPickerBusy = false;
-          _updatePlaylistPermissionUI();
-          return _openPlaylistInputFallback(true, '폴더 선택을 시작하지 못해 브라우저 기본 선택창으로 전환했습니다.');
-        }
       }
     } catch (error) {
       console.warn('[FSA] 부모 폴더 가져오기 직접 호출 실패', error);
     }
     if (!calledDirectly) {
+      return _openPlaylistInputFallback(true, '폴더 브리지를 찾지 못해 브라우저 기본 선택창으로 전환했습니다.');
+    }
+    playlistPickerBusy = true;
+    _updatePlaylistPermissionUI();
+    try {
+      const started = await pickerRequest;
+      if (!started) {
+        playlistPickerBusy = false;
+        _updatePlaylistPermissionUI();
+        return false;
+      }
+    } catch (error) {
       playlistPickerBusy = false;
       _updatePlaylistPermissionUI();
-      return _openPlaylistInputFallback(true, '폴더 브리지를 찾지 못해 브라우저 기본 선택창으로 전환했습니다.');
+      console.warn('[FSA] 부모 폴더 가져오기 실패', error);
+      showTimeDisplay(`⚠ 폴더 선택을 시작하지 못했습니다: ${error?.message || '브라우저 오류'}`, 7000);
+      return false;
     }
     clearTimeout(playlistHostRequestTimer);
     playlistHostRequestTimer = setTimeout(() => {
@@ -9317,13 +9719,14 @@ async function openPlaylistFolderFSA(replaceExisting = false) {
     return _openPlaylistInputFallback(true, '폴더 선택기를 엽니다. 이 폴백은 새로고침 뒤 다시 선택해야 합니다.');
   }
 
-  playlistPickerBusy = true;
-  _updatePlaylistPermissionUI();
   try {
     const startHandle = immediateStartHandle;
     const options = { id:'iniVideoPlayer-playlist-root', mode:'read' };
     if (startHandle) options.startIn = startHandle;
-    const root = await window.showDirectoryPicker(options);
+    const pickerRequest = window.showDirectoryPicker(options);
+    playlistPickerBusy = true;
+    _updatePlaylistPermissionUI();
+    const root = await pickerRequest;
     void _saveLastFilePickerHandle(root);
     const result = await _collectPlaylistFolderRecords(root);
     if (!result.readyVideos) {
@@ -9334,7 +9737,7 @@ async function openPlaylistFolderFSA(replaceExisting = false) {
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.warn('[FSA] 재생목록 폴더 열기 실패', error);
-      return _openPlaylistInputFallback(true, '폴더 권한 선택을 시작하지 못해 기본 폴더 선택창으로 전환했습니다.');
+      showTimeDisplay(`⚠ 폴더 선택을 열지 못했습니다: ${error?.message || '브라우저 오류'}`, 7000);
     }
     return false;
   } finally {
@@ -9352,26 +9755,35 @@ async function openFilePickerFSA() {
       llt:'vp-access-pick-files', playlistLength:playlist.length,
       autoPlay:true
     };
-    playlistPickerBusy = true;
-    _updatePlaylistPermissionUI();
     let calledDirectly = false;
+    let pickerRequest = null;
     try {
       if (parent && typeof parent.vpAccessHostPickFilesFromPlayer === 'function') {
+        // iframe의 사용자 클릭 활성화가 살아 있는 동안 부모 파일 선택기를 연다.
+        pickerRequest = parent.vpAccessHostPickFilesFromPlayer(payload);
         calledDirectly = true;
-        const started = await parent.vpAccessHostPickFilesFromPlayer(payload);
-        if (!started) {
-          playlistPickerBusy = false;
-          _updatePlaylistPermissionUI();
-          return _openPlaylistInputFallback(false, '파일 선택을 시작하지 못해 브라우저 기본 선택창으로 전환했습니다.');
-        }
       }
     } catch (error) {
       console.warn('[FSA] 부모 파일 선택기 직접 호출 실패', error);
     }
     if (!calledDirectly) {
+      return _openPlaylistInputFallback(false, '파일 브리지를 찾지 못해 브라우저 기본 선택창으로 전환했습니다.');
+    }
+    playlistPickerBusy = true;
+    _updatePlaylistPermissionUI();
+    try {
+      const started = await pickerRequest;
+      if (!started) {
+        playlistPickerBusy = false;
+        _updatePlaylistPermissionUI();
+        return false;
+      }
+    } catch (error) {
       playlistPickerBusy = false;
       _updatePlaylistPermissionUI();
-      return _openPlaylistInputFallback(false, '파일 브리지를 찾지 못해 브라우저 기본 선택창으로 전환했습니다.');
+      console.warn('[FSA] 부모 파일 가져오기 실패', error);
+      showTimeDisplay(`⚠ 파일 선택을 시작하지 못했습니다: ${error?.message || '브라우저 오류'}`, 7000);
+      return false;
     }
     clearTimeout(playlistHostRequestTimer);
     playlistHostRequestTimer = setTimeout(() => {
@@ -9386,15 +9798,16 @@ async function openFilePickerFSA() {
   if (!window.showOpenFilePicker) {
     return _openPlaylistInputFallback(false, '파일 선택기를 엽니다. 이 폴백은 새로고침 뒤 다시 선택해야 합니다.');
   }
-  playlistPickerBusy = true;
-  _updatePlaylistPermissionUI();
   try {
     // id 옵션: Chrome 이 이 id 에 마지막 선택 경로를 기억 (브라우저 재시작 이후에도 유지)
     // startIn: 마지막으로 열었던 파일 핸들을 hint 로 전달 — Chrome 이 파일의 부모 폴더에서 시작
     const pickOpts = { multiple: true, id: 'iniVideoPlayer-files' };
     const lastHandle = playlistLastPickerHandle;
     if (lastHandle) pickOpts.startIn = lastHandle;
-    const handles = await window.showOpenFilePicker(pickOpts);
+    const pickerRequest = window.showOpenFilePicker(pickOpts);
+    playlistPickerBusy = true;
+    _updatePlaylistPermissionUI();
+    const handles = await pickerRequest;
     const videoHandles = handles.filter(h => VIDEO_EXT.test(h.name));
     const srtHandles   = handles.filter(h => h.name.toLowerCase().endsWith('.srt'));
     if (!videoHandles.length) { showTimeDisplay('⚠ 동영상 파일이 없습니다'); return; }
@@ -9435,7 +9848,7 @@ async function openFilePickerFSA() {
   } catch(e) {
     if (e.name !== 'AbortError') {
       console.warn('[FSA] 파일 선택 실패', e);
-      _openPlaylistInputFallback(false, '파일 권한 선택을 시작하지 못해 기본 파일 선택창으로 전환했습니다.');
+      showTimeDisplay(`⚠ 파일 선택을 열지 못했습니다: ${e?.message || '브라우저 오류'}`, 7000);
     }
   } finally {
     playlistPickerBusy = false;
@@ -9528,6 +9941,29 @@ applyStealth();
 </script>
 
 
+<script>
+(function disableChromeSelectAllOutsideEditors() {
+  function isEditableTarget(target) {
+    const element = target && target.nodeType === 1 ? target : target && target.parentElement;
+    if (!element) return false;
+    if (element.isContentEditable) return true;
+    const editor = element.closest('textarea, input, [role="textbox"]');
+    if (!editor || editor.disabled || editor.readOnly) return false;
+    if (editor.tagName === 'TEXTAREA') return true;
+    if (editor.tagName === 'INPUT') {
+      return /^(text|search|url|tel|email|password|number)$/i.test(editor.type || 'text');
+    }
+    return editor.getAttribute('aria-readonly') !== 'true' &&
+      editor.getAttribute('aria-disabled') !== 'true';
+  }
+
+  document.addEventListener('keydown', function preventChromePageSelectAll(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.code !== 'KeyA') return;
+    if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return;
+    e.preventDefault();
+  }, true);
+})();
+</script>
 </body></html>
 
 

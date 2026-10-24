@@ -1106,7 +1106,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   <!-- 우측: 플레이리스트 + 자막리스트 + SRT편집 -->
   <div id="rightPanel" style="display:flex; flex-direction:column; flex:0 0 400px; min-width:180px; max-width:500px; overflow:hidden; position:relative; gap:0;" class="hidden">
     <!-- 플레이리스트 -->
-    <div id="playlistSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; flex:0 0 50vh; overflow:hidden; display:flex; flex-direction:column; min-height:0;">
+    <div id="playlistSection" style="border:2px dashed #666; border-radius:5px; background:#0a0a0a; flex:0 0 70vh; overflow:hidden; display:flex; flex-direction:column; min-height:0;">
       <!-- 상단 고정: 타이틀 + 반복버튼 -->
       <div style="padding:8px 10px 6px; flex-shrink:0; border-bottom:1px solid #2a2a2a;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -1489,12 +1489,15 @@ function getSC(id) {
 function matchSC(id, e) {
   const sc = getSC(id);
   if (!sc) return false;
-  return e.code === sc.code && e.shiftKey === sc.shift && e.ctrlKey === sc.ctrl && e.altKey === (sc.alt === true);
+  const codeMatches = e.code === sc.code ||
+    (id === 'pl-open-location' && sc.code === 'Enter' && e.code === 'NumpadEnter' && e.key === 'Enter');
+  return codeMatches && e.shiftKey === sc.shift && e.ctrlKey === sc.ctrl && e.altKey === (sc.alt === true);
 }
 function saveSC() {
   localStorage.setItem('iniVP_SC', JSON.stringify(customSC));
   renderShortcutPanel();
   try { saveSettings(); } catch(_) {}
+  _postPlaylistSelectionState();
 }
 function resetSC(id) { delete customSC[id]; saveSC(); }
 function resetAllSC() { customSC = {}; saveSC(); }
@@ -2390,22 +2393,44 @@ function _playlistHoverTargetIndex() {
 }
 
 let _lastPostedPlaylistSelectionCount = -1;
+let _lastPostedPlaylistLocationIndex = -2;
+let _lastPostedPlaylistLocationShortcut = '';
 let _lastPostedPlayerCopyContextActive = null;
 function _postPlaylistSelectionState() {
   if (!_isEmbeddedPlaylistPlayer() || window.parent === window) return false;
   const count = Array.from(selectedIndices)
     .filter(index => index >= 0 && index < playlist.length).length;
+  const selectedIndex = _playlistLocationTargetIndex();
+  const shortcut = getSC('pl-open-location') || {};
+  const locationShortcut = {
+    code:String(shortcut.code || ''), ctrl:shortcut.ctrl === true,
+    shift:shortcut.shift === true, alt:shortcut.alt === true
+  };
+  const locationShortcutKey = JSON.stringify(locationShortcut);
   const copyContextActive = count > 0 || _playlistHoverTargetIndex() >= 0 || !!_panelHoverCopyPayload();
   if (count === _lastPostedPlaylistSelectionCount &&
+      selectedIndex === _lastPostedPlaylistLocationIndex &&
+      locationShortcutKey === _lastPostedPlaylistLocationShortcut &&
       copyContextActive === _lastPostedPlayerCopyContextActive) return false;
   _lastPostedPlaylistSelectionCount = count;
+  _lastPostedPlaylistLocationIndex = selectedIndex;
+  _lastPostedPlaylistLocationShortcut = locationShortcutKey;
   _lastPostedPlayerCopyContextActive = copyContextActive;
   try {
-    window.parent.postMessage({ llt:'vp-playlist-selection-state', count, copyContextActive }, '*');
+    window.parent.postMessage({ llt:'vp-playlist-selection-state', count, selectedIndex, locationShortcut, copyContextActive }, '*');
     return true;
   } catch (_) {
     return false;
   }
+}
+
+function _playlistBestKnownPath(...values) {
+  return values.map(value => String(value || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''))
+    .filter(Boolean)
+    .sort((a, b) => {
+      const depth = b.split('/').filter(Boolean).length - a.split('/').filter(Boolean).length;
+      return depth || b.length - a.length;
+    })[0] || '';
 }
 
 function _playlistParentFromKnownPath(path, sourceRootName = '') {
@@ -2414,7 +2439,7 @@ function _playlistParentFromKnownPath(path, sourceRootName = '') {
   const parts = normalized.split('/').filter(Boolean);
   if (parts.length) parts.pop();
   const rootName = String(sourceRootName || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-  if (rootName && parts[0] !== rootName) parts.unshift(rootName);
+  if (rootName && String(parts[0] || '').toLocaleLowerCase() !== rootName.toLocaleLowerCase()) parts.unshift(rootName);
   return parts.join('\\');
 }
 
@@ -2525,9 +2550,8 @@ async function _standalonePlaylistParentPath(item) {
       }
     } catch (_) {}
   }
-  const webkitPath = String(item?.video?.webkitRelativePath || '');
-  if (webkitPath) return _playlistParentFromKnownPath(webkitPath);
-  return _playlistParentFromKnownPath(item?.videoPath, item?.sourceRootName);
+  const knownPath = _playlistBestKnownPath(item?.videoPath, item?.video?.webkitRelativePath);
+  return _playlistParentFromKnownPath(knownPath, item?.sourceRootName);
 }
 
 async function copyPlaylistItemParentPath(index = _playlistLocationTargetIndex()) {
@@ -2539,7 +2563,9 @@ async function copyPlaylistItemParentPath(index = _playlistLocationTargetIndex()
   const payload = {
     llt:'vp-access-copy-parent', accessId:String(item.accessId || ''),
     itemIndex:index, kind:'video', name:_playlistFileName(item, 'video'),
-    path:String(item.videoPath || ''), sourceRootName:String(item.sourceRootName || '')
+    path:_playlistBestKnownPath(item.videoPath, item.video?.webkitRelativePath),
+    relativePath:String(item.video?.webkitRelativePath || ''),
+    sourceRootName:String(item.sourceRootName || '')
   };
   if (_isEmbeddedPlaylistPlayer() && window.parent !== window) {
     try {
@@ -6190,7 +6216,10 @@ function applyPendingLayout() {
   setFlex('translationPanel', L.transH);
   setFlex('charDictPanel',    L.dictH);
   setFlex('controlsSection',  L.controlsH);
-  setFlex('playlistSection',  L.playlistH);
+  // 예전 기본 높이만 70vh로 옮기고, 사용자가 리사이즈해 저장한 값은 그대로 복원한다.
+  const savedPlaylistFlex = String(L.playlistH || '').trim().replace(/\s+/g, ' ');
+  setFlex('playlistSection',
+    savedPlaylistFlex === '0 0 50vh' ? '0 0 70vh' : L.playlistH);
   setFlex('subsSection',      L.subsH);
   setFlex('editorSection',    L.editorH);
   if (L.leftPanelW) { const lp = document.getElementById('leftPanel'); if (lp) lp.style.flex = L.leftPanelW; }
