@@ -10737,7 +10737,7 @@ function updateOverlayShiftTarget(x,y) {
     target.element.classList.add(overlayCtrlTargetClass);
     overlayScaleHintNode.textContent=target.enabled
       ?target.label+' '+Math.round(overlayScaleValueForKey(target.key)*100)+'% · Ctrl+클릭 표시/숨김 · 드래그 위치 · 휠 크기'
-      :target.label+' 숨김 · Ctrl+클릭 켜기 · 드래그 위치';
+      :target.label+' 숨김 · Ctrl+클릭 켜기 · 드래그 위치 · Ctrl+휠 크기';
     overlayScaleHintNode.style.display='block';
     placeOverlayFloatingElement(overlayScaleHintNode,container,target,overlayInteractionPointer.x,overlayInteractionPointer.y,true);
   }else if(overlayScaleHintNode)overlayScaleHintNode.style.display='none';
