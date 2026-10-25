@@ -7967,6 +7967,10 @@ function _fileBaseName(name) {
   const cut = value.lastIndexOf('.');
   return (cut > 0 ? value.slice(0, cut) : value).toLowerCase();
 }
+function _playlistSubtitleStemMatches(videoBase, subtitleBase) {
+  return subtitleBase === videoBase ||
+    (subtitleBase.startsWith(videoBase) && /^[._\-\s]/.test(subtitleBase.slice(videoBase.length)));
+}
 
 async function _rootEntryByPath(root, relativePath) {
   const parts = String(relativePath || '').replace(/\\/g, '/').split('/').filter(Boolean);
@@ -8019,6 +8023,44 @@ function _takeIndexedEntry(entries, preferredDirectory, usedPaths) {
   return entry || null;
 }
 
+function _choosePlaylistSubtitle(candidates, videoEntry, videoEntries, usedPaths) {
+  const available = (candidates || []).filter(entry => !usedPaths.has(entry.path));
+  if (!available.length) return null;
+  const videoBase = _fileBaseName(videoEntry.name);
+  const videoDir = _pathDirectory(videoEntry.path);
+  const sameDirectory = available.filter(entry => _pathDirectory(entry.path) === videoDir);
+  const scoped = sameDirectory.length ? sameDirectory : available;
+  const exact = scoped.filter(entry => _fileBaseName(entry.name) === videoBase);
+  if (exact.length) {
+    if (!sameDirectory.length && exact.length !== 1) return null;
+    exact.sort((a, b) => String(a.path).localeCompare(String(b.path), undefined, { numeric:true, sensitivity:'base' }));
+    usedPaths.add(exact[0].path);
+    return exact[0];
+  }
+
+  const compatible = scoped.filter(entry => {
+    const subtitleBase = _fileBaseName(entry.name);
+    return !videoEntries.some(other =>
+      other !== videoEntry &&
+      _pathDirectory(other.path) === videoDir &&
+      _fileBaseName(other.name) === subtitleBase
+    );
+  });
+  if (!compatible.length) return null;
+  const priority = entry => {
+    const suffix = _fileBaseName(entry.name).slice(videoBase.length).replace(/^[._\-\s]+/, '');
+    if (/(zh[-_.]?(hans|cn)|chs|sc|simplified|简体|简中)/i.test(suffix)) return 0;
+    if (/(^|[._\-\s])(zh|cn|chinese|中文)(?=$|[._\-\s])/i.test(suffix)) return 1;
+    return 2;
+  };
+  const bestPriority = Math.min(...compatible.map(priority));
+  const best = compatible.filter(entry => priority(entry) === bestPriority);
+  if (!sameDirectory.length && best.length !== 1) return null;
+  best.sort((a, b) => String(a.path).localeCompare(String(b.path), undefined, { numeric:true, sensitivity:'base' }));
+  usedPaths.add(best[0].path);
+  return best[0];
+}
+
 function _playlistPathCompare(a, b) {
   return String(a?.path || a?.name || '').localeCompare(
     String(b?.path || b?.name || ''),
@@ -8043,11 +8085,10 @@ async function _collectPlaylistFolderRecords(root) {
     catch (_) { unreadableVideos++; continue; }
 
     const base = _fileBaseName(videoEntry.name);
-    const candidates = subtitlesInOrder.filter(entry => {
-      const srtBase = _fileBaseName(entry.name);
-      return srtBase === base || srtBase.startsWith(base + '.');
-    });
-    const srtEntry = _takeIndexedEntry(candidates, _pathDirectory(videoEntry.path), usedSrtPaths);
+    const candidates = subtitlesInOrder.filter(entry =>
+      _playlistSubtitleStemMatches(base, _fileBaseName(entry.name))
+    );
+    const srtEntry = _choosePlaylistSubtitle(candidates, videoEntry, videos, usedSrtPaths);
     let srtFile = null;
     if (srtEntry) {
       try { srtFile = await _playlistFileWait(srtEntry.handle.getFile()); } catch (_) { srtFile = null; }
@@ -8070,7 +8111,9 @@ async function _collectPlaylistFolderRecords(root) {
     records,
     readyVideos:records.length,
     missingVideos:unreadableVideos,
-    missingSubtitles:0
+    missingSubtitles:0,
+    subtitleFileCount:subtitlesInOrder.length,
+    linkedSubtitleCount:records.filter(record => !!record.srtFile).length
   };
 }
 
@@ -8402,7 +8445,12 @@ async function _applyImportedPlaylistFolder(payload, rootHandle = null) {
     _setPlaylistImportStatus(message, 9000);
     showTimeDisplay(message, 9000);
   } else {
-    _setPlaylistImportStatus(payload?.storageWarning || '');
+    const linkedSrts = imported.filter(item => !!item.srt).length;
+    const discoveredSrts = Math.max(0, Number(payload?.subtitleFileCount) || 0);
+    const srtSummary = linkedSrts
+      ? 'SRT ' + linkedSrts + '개 연결'
+      : (discoveredSrts ? 'SRT ' + discoveredSrts + '개 발견 · 이름이 맞는 파일 없음' : 'SRT 파일 없음');
+    _setPlaylistImportStatus(payload?.storageWarning || ('폴더 불러오기 완료 · 영상 ' + imported.length + '개 · ' + srtSummary), 5000);
     if (!payload?.storageWarning) hideTimeDisplay();
   }
   if (autoPlayTarget >= 0 && payload?.autoPlay !== false) video.play().catch(() => {});
