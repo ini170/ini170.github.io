@@ -829,16 +829,26 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 }
 #shiftHoverPanel[hidden] { display:none !important; }
 #shiftHoverPanelHeader {
-  display:flex; align-items:center; justify-content:space-between; gap:7px; flex:0 0 30px;
-  min-height:30px; padding:2px 5px 2px 8px; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:flex-start; gap:8px; flex:0 0 38px;
+  min-height:38px; padding:3px 7px 3px 10px; box-sizing:border-box;
   color:#dedee0; background:#29292b; border-bottom:1px solid #48484b;
   user-select:none;
 }
-#shiftHoverPanelTitle { font-size:11px; font-weight:700; letter-spacing:.02em; }
-#shiftHoverPanelHint { margin-left:auto; color:#929296; font-size:9px; }
+#shiftHoverPanelTitle { font-size:13px; font-weight:700; letter-spacing:.01em; white-space:nowrap; }
+#shiftHoverPanelHint { display:none; }
+#shiftHoverPanelScaleControls { display:flex; align-items:center; gap:5px; margin-left:auto; }
+#shiftHoverPanelScaleControls > span { color:#aaa; font-size:11px; white-space:nowrap; }
+#shiftHoverPanelScaleValue { min-width:42px; color:#eee; text-align:center; font-size:12px; font-variant-numeric:tabular-nums; }
+#shiftHoverPanelScaleControls button {
+  min-width:29px; height:28px; padding:0 7px; border:1px solid #5a5a5d; border-radius:4px;
+  color:#e5e5e7; background:#38383a; font-size:16px; line-height:1; cursor:pointer;
+}
+#shiftHoverPanelScaleControls button:hover { color:#fff; background:#4a4a4d; }
+#shiftHoverPanelScaleControls button:disabled { color:#777; background:#303032; border-color:#454548; cursor:default; opacity:.72; }
+#shiftHoverPanelScaleControls #shiftHoverPanelScaleReset { min-width:52px; font-size:11px; }
 #shiftHoverPanelClose {
-  flex:0 0 23px; width:23px; height:23px; padding:0; border:1px solid #55565a; border-radius:4px;
-  color:#c5c5c8; background:#353538; cursor:pointer; font-size:16px; line-height:1;
+  flex:0 0 28px; width:28px; height:28px; padding:0; border:1px solid #55565a; border-radius:4px;
+  color:#c5c5c8; background:#353538; cursor:pointer; font-size:19px; line-height:1;
 }
 #shiftHoverPanelClose:hover { color:#fff; background:#454548; }
 #shiftHoverPanelBody { position:relative; flex:1 1 0; min-width:0; min-height:0; overflow:hidden; padding:0; box-sizing:border-box; touch-action:none; }
@@ -928,23 +938,68 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #shiftHoverPanel .overlay-position-row input { width:100%; min-width:0; height:14px !important; min-height:14px; margin:0; }
 #shiftHoverPanel .overlay-position-row output { color:#ccc; font-size:8px; }
 #shiftHoverPanel .overlay-position-reset { grid-row:6; width:100%; min-height:0; padding:1px 3px; font-size:8px; }
+/* C361: simplify the header and make controls readable; the header scale buttons adjust the whole dashboard. */
+#shiftHoverPanel .bfp-section { padding:7px; border-radius:6px; }
+#shiftHoverPanel .bfp-section-title { margin-bottom:5px; font-size:11px; }
+#shiftHoverPanel .bfp-row { gap:5px; margin-bottom:5px; }
+#shiftHoverPanel .bfp-btn { min-height:27px; padding:4px 6px; font-size:11px; }
+#shiftHoverPanel #controlsSection > div:nth-child(2) { font-size:12px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(3) { gap:4px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(3) button { min-height:27px; padding:4px 3px !important; font-size:11px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(3) button span:last-child { font-size:9px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(4),
+#shiftHoverPanel #controlsSection > div:nth-child(5),
+#shiftHoverPanel #controlsSection > div:nth-child(6),
+#shiftHoverPanel #controlsSection > div:nth-child(7),
+#shiftHoverPanel #controlsSection > div:nth-child(8),
+#shiftHoverPanel #controlsSection > div:nth-child(9),
+#shiftHoverPanel #controlsSection > div:nth-child(10),
+#shiftHoverPanel #controlsSection > div:nth-child(11),
+#shiftHoverPanel #controlsSection > div:nth-child(12),
+#shiftHoverPanel #controlsSection > div:nth-child(13) { font-size:10px !important; }
+#shiftHoverPanel #controlsSection input[type="range"] { min-height:18px; }
+#shiftHoverPanel .overlay-scale-card { grid-template-rows:24px 17px 18px 20px minmax(0,1fr) 20px; gap:2px; padding:5px; border-radius:6px; }
+#shiftHoverPanel .overlay-scale-meta { font-size:9px; }
+#shiftHoverPanel .overlay-scale-value { font-size:10px; }
+#shiftHoverPanel .overlay-scale-slider { height:18px !important; min-height:18px; }
+#shiftHoverPanel .overlay-scale-align { font-size:9px; }
+#shiftHoverPanel .overlay-scale-align .bfp-btn { min-height:19px; font-size:9px; }
+#shiftHoverPanel .overlay-position-row { grid-template-columns:21px minmax(0,1fr) 32px; font-size:9px; }
+#shiftHoverPanel .overlay-position-row input { height:18px !important; min-height:18px; }
+#shiftHoverPanel .overlay-position-row output { font-size:9px; }
+#shiftHoverPanel .overlay-position-reset { min-height:18px; font-size:9px; }
+#shiftHoverPanel[data-density="tight"] .bfp-section { padding:4px; }
+#shiftHoverPanel[data-density="tight"] .bfp-section-title { font-size:9px; }
+#shiftHoverPanel[data-density="tight"] .bfp-btn { min-height:21px; font-size:9px; }
+#shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(3) button { min-height:21px; font-size:9px !important; }
+#shiftHoverPanel[data-density="tight"] .overlay-scale-card { grid-template-rows:20px 14px 14px 17px minmax(0,1fr) 17px; padding:3px; }
+#shiftHoverPanel[data-density="tight"] .overlay-position-row input { height:18px !important; min-height:18px; }
+@media (max-width:560px) {
+  #shiftHoverPanelHeader { gap:4px; padding-left:6px; }
+  #shiftHoverPanelTitle { font-size:11px; }
+  #shiftHoverPanelScaleControls { gap:3px; }
+  #shiftHoverPanelScaleControls > span { display:none; }
+  #shiftHoverPanelScaleControls button { min-width:25px; height:25px; padding:0 5px; }
+  #shiftHoverPanelScaleControls #shiftHoverPanelScaleReset { min-width:42px; font-size:10px; }
+  #shiftHoverPanelScaleValue { min-width:35px; font-size:10px; }
+}
 @media (pointer: coarse) {
-  #shiftHoverPanel .overlay-position-row input { height:14px !important; min-height:14px; }
-  #shiftHoverPanel #controlsSection input[type="range"] { min-height:14px; }
+  #shiftHoverPanel .overlay-position-row input { height:18px !important; min-height:18px; }
+  #shiftHoverPanel #controlsSection input[type="range"] { min-height:18px; }
 }
 #shiftHoverPanel[data-density="tight"] #shiftHoverPanelTitle { font-size:10px; }
 #shiftHoverPanel[data-density="tight"] #shiftHoverPanelHint { font-size:8px; }
 #shiftHoverPanel[data-density="tight"] #shiftHoverPanelCanvas { gap:3px; }
-#shiftHoverPanel[data-density="tight"] .bfp-section { padding:3px; }
-#shiftHoverPanel[data-density="tight"] .bfp-section-title { font-size:8px; }
-#shiftHoverPanel[data-density="tight"] .bfp-btn { min-height:18px; font-size:8px; }
+#shiftHoverPanel[data-density="tight"] .bfp-section { padding:4px; }
+#shiftHoverPanel[data-density="tight"] .bfp-section-title { font-size:9px; }
+#shiftHoverPanel[data-density="tight"] .bfp-btn { min-height:21px; font-size:9px; }
 #shiftHoverPanel[data-density="tight"] #controlsSection { gap:2px; padding:2px !important; }
 #shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(3) button { font-size:9px !important; }
 #shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(7) { padding:2px 3px !important; }
 #shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(8) { padding:2px 3px !important; }
-#shiftHoverPanel[data-density="tight"] .overlay-scale-card { padding:2px; grid-template-rows:18px 12px 12px 15px minmax(0,1fr) 15px; }
-#shiftHoverPanel[data-density="tight"] .overlay-scale-card > .bfp-btn { font-size:8px; }
-#shiftHoverPanel[data-density="tight"] .overlay-position-row { grid-template-columns:16px minmax(0,1fr) 25px; }
+#shiftHoverPanel[data-density="tight"] .overlay-scale-card { padding:3px; grid-template-rows:20px 14px 14px 17px minmax(0,1fr) 17px; }
+#shiftHoverPanel[data-density="tight"] .overlay-scale-card > .bfp-btn { font-size:9px; }
+#shiftHoverPanel[data-density="tight"] .overlay-position-row { grid-template-columns:18px minmax(0,1fr) 28px; }
 /* ===== 오디오 전용 모드 바 ===== */
 
 #audioModeBar {
@@ -1125,7 +1180,13 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       <section id="shiftHoverPanel" role="dialog" aria-label="플레이어 전체 설정" aria-hidden="true" hidden>
         <header id="shiftHoverPanelHeader">
           <span id="shiftHoverPanelTitle">플레이어 전체 설정</span>
-          <span id="shiftHoverPanelHint">Shift 호버 · 한 화면 전체 조작</span>
+          <span id="shiftHoverPanelScaleControls" aria-label="설정 화면 크기">
+            <span>크기</span>
+            <button type="button" aria-label="설정 화면 작게" title="설정 화면 작게" onclick="adjustShiftHoverPanelScale(-0.05)">−</button>
+            <output id="shiftHoverPanelScaleValue" aria-live="polite">115%</output>
+            <button type="button" aria-label="설정 화면 크게" title="설정 화면 크게" onclick="adjustShiftHoverPanelScale(0.05)">+</button>
+            <button id="shiftHoverPanelScaleReset" type="button" title="기본 크기로" onclick="resetShiftHoverPanelScale()">기본</button>
+          </span>
           <button id="shiftHoverPanelClose" type="button" aria-label="설정 창 닫기" title="닫기 · Shift 해제 전까지 숨김" onclick="closeShiftHoverControlPanel(true)">×</button>
         </header>
         <div id="shiftHoverPanelBody">
@@ -10645,6 +10706,13 @@ let bottomFloatOpen = false;
 let bottomFloatHoverOpen = false;
 let shiftHoverControlPanelOpen = false;
 let shiftHoverControlPanelDismissed = false;
+const SHIFT_HOVER_PANEL_SCALE_KEY = 'iniVideoPlayer.shiftHoverPanelScale.v1';
+const SHIFT_HOVER_PANEL_SCALE_DEFAULT = 1.15;
+let shiftHoverPanelScaleTarget = SHIFT_HOVER_PANEL_SCALE_DEFAULT;
+try {
+  const savedScale = Number.parseFloat(localStorage.getItem(SHIFT_HOVER_PANEL_SCALE_KEY));
+  if (Number.isFinite(savedScale)) shiftHoverPanelScaleTarget = Math.max(0.8, Math.min(1.6, savedScale));
+} catch (_) {}
 let bottomFloatPanelHomePlaceholder = null;
 const shiftHoverHomeMarkers = new Map();
 let shiftHoverForcedControlsDisplay = null;
@@ -10793,6 +10861,19 @@ function shiftHoverToggleAudioOnly() {
   toggleAudioOnly();
   updateShiftHoverPanelUI();
 }
+function setShiftHoverPanelScale(value) {
+  const bounded = Math.max(0.8, Math.min(1.6, Number(value)));
+  if (!Number.isFinite(bounded)) return;
+  shiftHoverPanelScaleTarget = Math.round(bounded * 20) / 20;
+  try { localStorage.setItem(SHIFT_HOVER_PANEL_SCALE_KEY, String(shiftHoverPanelScaleTarget)); } catch (_) {}
+  syncShiftHoverPanelFit();
+}
+function adjustShiftHoverPanelScale(delta) {
+  setShiftHoverPanelScale(shiftHoverPanelScaleTarget + Number(delta || 0));
+}
+function resetShiftHoverPanelScale() {
+  setShiftHoverPanelScale(SHIFT_HOVER_PANEL_SCALE_DEFAULT);
+}
 function syncShiftHoverPanelFit() {
   const panel = document.getElementById('shiftHoverPanel');
   const body = document.getElementById('shiftHoverPanelBody');
@@ -10801,12 +10882,27 @@ function syncShiftHoverPanelFit() {
   const width = body.clientWidth;
   const height = body.clientHeight;
   if (width < 1 || height < 1) return;
-  const scale = Math.min(1, width / 760, height / 500);
+  const scale = Math.min(shiftHoverPanelScaleTarget, width / 760, height / 500);
   if (!Number.isFinite(scale) || scale <= 0) return;
   canvas.style.width = (width / scale) + 'px';
   canvas.style.height = (height / scale) + 'px';
   canvas.style.setProperty('--shift-panel-scale', String(scale));
+  panel.dataset.appliedScale = String(scale);
   panel.dataset.density = scale < 0.72 ? 'tight' : 'normal';
+  const value = document.getElementById('shiftHoverPanelScaleValue');
+  const increase = document.querySelector('#shiftHoverPanelScaleControls button[aria-label="설정 화면 크게"]');
+  const decrease = document.querySelector('#shiftHoverPanelScaleControls button[aria-label="설정 화면 작게"]');
+  const reset = document.getElementById('shiftHoverPanelScaleReset');
+  if (value) {
+    value.value = `${Math.round(scale * 100)}%`;
+    value.textContent = value.value;
+    value.title = scale + 0.005 < shiftHoverPanelScaleTarget
+      ? `현재 창 크기에 맞춰 ${Math.round(scale * 100)}%로 표시 중 (설정 ${Math.round(shiftHoverPanelScaleTarget * 100)}%)`
+      : '설정 화면 크기';
+  }
+  if (increase) increase.disabled = shiftHoverPanelScaleTarget >= 1.6 || scale + 0.005 < shiftHoverPanelScaleTarget;
+  if (decrease) decrease.disabled = shiftHoverPanelScaleTarget <= 0.8;
+  if (reset) reset.disabled = Math.abs(shiftHoverPanelScaleTarget - SHIFT_HOVER_PANEL_SCALE_DEFAULT) < 0.005;
 }
 function installShiftHoverPanelInteractions() {
   const panel = document.getElementById('shiftHoverPanel');
