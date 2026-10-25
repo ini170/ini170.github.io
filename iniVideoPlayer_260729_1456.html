@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C360';
+document.documentElement.dataset.vpBuild = 'C464';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -810,11 +810,14 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .overlay-inline-controls .overlay-inline-toggle { min-width:42px; }
 .overlay-inline-controls .overlay-inline-align { display:inline-flex; align-items:center; flex-wrap:wrap; gap:2px; min-width:0; border-left:1px solid rgba(145,145,152,.38); padding-left:4px; }
 @media (max-width:480px) { .overlay-inline-controls { gap:3px; padding:3px; } .overlay-inline-controls button { min-width:24px; min-height:24px; padding:2px 3px; } }
-#videoContainerFullscreenButton { position:absolute; z-index:1002; top:auto; right:88px; bottom:54px; display:none; width:36px; min-width:36px; height:36px; min-height:36px; padding:0; align-items:center; justify-content:center; border:1px solid rgba(190,190,198,.32); border-radius:4px; background:rgba(18,18,20,.42); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+#videoContainerFullscreenButton { position:absolute; z-index:1300; top:10px; right:10px; bottom:auto; display:flex; opacity:.58; transition:opacity .15s; width:36px; min-width:36px; height:36px; min-height:36px; padding:0; align-items:center; justify-content:center; border:1px solid rgba(190,190,198,.32); border-radius:4px; background:rgba(18,18,20,.62); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
 #videoContainerFullscreenButton:hover,#videoContainerFullscreenButton:focus-visible { border-color:rgba(220,220,225,.55); background:rgba(68,68,74,.72); }
 #video::-webkit-media-controls-fullscreen-button { display:none !important; }
-@media (max-width:480px) { #videoContainerFullscreenButton { right:56px; bottom:48px; width:34px; min-width:34px; height:34px; min-height:34px; } }
-#videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { display:flex; }
+@media (max-width:480px) { #videoContainerFullscreenButton { top:7px; right:7px; width:34px; min-width:34px; height:34px; min-height:34px; } }
+#videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { opacity:1; }
+#videoContainer.vp-native-controls-quiet video::-webkit-media-controls-enclosure,
+#videoContainer.vp-native-controls-quiet video::-webkit-media-controls-panel,
+#videoContainer.vp-native-controls-quiet video::-webkit-media-controls { display:none !important; }
 #videoContainer:fullscreen,#videoContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; max-width:100vw !important; max-height:100vh !important; flex:none !important; border:0 !important; border-radius:0 !important; background:#000 !important; }
 #videoContainer:fullscreen > video,#videoContainer:-webkit-full-screen > video { width:100% !important; height:100% !important; object-fit:contain; }
 #videoContainer.shift-hover-panel-open { touch-action:pan-y; }
@@ -1128,7 +1131,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   }
 }
 </style>
-<script src="tts-china-client.js" defer></script>
+<script src="tts-china-client.js?build=C464" defer></script>
 </head>
 <body style="cursor: default;">
 
@@ -1644,6 +1647,10 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         <button class="bfp-btn" id="bf-vol" style="flex:0 0 60px; pointer-events:none; color:#4fc3f7;">30%</button>
         <button class="bfp-btn" onclick="adjustMainVolume(0.1)">🔊 +10%</button>
       </div>
+      <div class="bfp-row" style="align-items:center;gap:8px;margin-top:6px">
+        <label for="mainVolumeSlider" style="font-size:12px;color:#bbb;white-space:nowrap">0–150%</label>
+        <input id="mainVolumeSlider" type="range" min="0" max="150" step="5" value="30" aria-label="플레이어 음량 0에서 150퍼센트" style="flex:1;min-width:100px">
+      </div>
     </div>
 
     <!-- 패널 토글 -->
@@ -1803,11 +1810,53 @@ if (window.MutationObserver && overlay) {
 const playlistDiv = document.getElementById('playlist');
 const subsDiv = document.getElementById('subs');
 const editor = document.getElementById('editor');
-// 전역 메인 볼륨 — 휠/단축키/버튼 등 모든 볼륨 조작의 단일 기준.
+// 전역 메인 볼륨 — 휠/단축키/버튼/슬라이더 등 모든 볼륨 조작의 단일 기준.
 // TTS 오버랩 덕킹은 video.volume 에만 일시 적용되고 mainVolume 은 그대로 유지되므로
 // 루프 반복 종료 시 복원되어도 조작자가 바꾼 볼륨이 회귀하지 않는다.
+const VP_VOLUME_MAX = 1.5;
+const VP_MEDIA_GAINS = new WeakMap();
+let VP_VOLUME_CONTEXT = null;
+function vpCanAmplifyMedia(media){
+  const src = String(media?.currentSrc || media?.src || '').trim();
+  if (!src) return false;
+  try {
+    const url = new URL(src, document.baseURI);
+    if (url.protocol === 'blob:') return url.origin === location.origin;
+    return location.origin !== 'null' && url.origin === location.origin;
+  } catch (_) { return false; }
+}
+function vpSetMediaVolume(media, value){
+  if (!media) return;
+  const vol = Math.max(0, Math.min(VP_VOLUME_MAX, Number(value) || 0));
+  let route = VP_MEDIA_GAINS.get(media);
+  if (!route && vol > 1 && vpCanAmplifyMedia(media)) {
+    try {
+      const AudioContextType = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextType) throw new Error('Web Audio unavailable');
+      const context = VP_VOLUME_CONTEXT || (VP_VOLUME_CONTEXT = new AudioContextType());
+      let source = null;
+      try {
+        source = context.createMediaElementSource(media);
+        const gain = context.createGain();
+        source.connect(gain); gain.connect(context.destination);
+        route = { context, source, gain };
+        VP_MEDIA_GAINS.set(media, route);
+        media.addEventListener('play', () => { if (context.state === 'suspended') context.resume().catch(() => {}); });
+      } catch (error) { try { source?.connect(context.destination); } catch (_) {} throw error; }
+    } catch (_) { route = null; }
+  }
+  if (route && vpCanAmplifyMedia(media)) {
+    try {
+      media.volume = 1;
+      route.gain.gain.setTargetAtTime(vol, route.context.currentTime, 0.025);
+      if (route.context.state === 'suspended') route.context.resume().catch(() => {});
+      return;
+    } catch (_) {}
+  }
+  try { media.volume = Math.min(1, vol); } catch (_) {}
+}
 let mainVolume = 0.3;
-video.volume = mainVolume; // 기본 소리 크기 30% (최초 1회만)
+vpSetMediaVolume(video, mainVolume); // 기본 소리 크기 30% (최초 1회만)
 let mainVolumeSaveTimer = null;
 
 function scheduleMainVolumeSave() {
@@ -1826,23 +1875,29 @@ function getTtsOutputVolume() {
 function applyTtsOutputVolume() {
   const outputVolume = getTtsOutputVolume();
   try { window.LLTChina?.setVolume(outputVolume); } catch (_) {}
-  if (ttsPhaseAudio) ttsPhaseAudio.volume = outputVolume;
-  if (ttsAudio) ttsAudio.volume = outputVolume;
+  if (ttsPhaseAudio) vpSetMediaVolume(ttsPhaseAudio, outputVolume);
+  if (ttsAudio) vpSetMediaVolume(ttsAudio, outputVolume);
 }
 
 function applyMainVolume() {
   applyTtsOutputVolume();
-  video.volume = (inTtsPhase && ttsLoopMode === 'overlap')
+  vpSetMediaVolume(video, (inTtsPhase && ttsLoopMode === 'overlap')
     ? Math.max(0.01, mainVolume * 0.1)
-    : mainVolume;
+    : mainVolume);
 }
 
 function adjustMainVolume(delta) {
-  mainVolume = Math.round(Math.max(0, Math.min(1, mainVolume + delta)) * 100) / 100;
+  mainVolume = Math.round(Math.max(0, Math.min(VP_VOLUME_MAX, mainVolume + delta)) * 100) / 100;
   applyMainVolume();
   scheduleMainVolumeSave();
+  updateBottomFloatUI(); updateShiftHoverPanelUI();
   showTimeDisplay(`${delta < 0 ? '🔉' : '🔊'} ${Math.round(mainVolume * 100)}%`);
 }
+
+document.getElementById('mainVolumeSlider')?.addEventListener('input', event => {
+  mainVolume = Math.max(0, Math.min(VP_VOLUME_MAX, Number(event.target.value) / 100));
+  applyMainVolume(); scheduleMainVolumeSave(); updateBottomFloatUI(); updateShiftHoverPanelUI();
+});
 
 // ===================================================================
 // 단축키 설정 시스템
@@ -1988,6 +2043,14 @@ function _playerKeyboardEntryTarget(target) {
   const el = target && target.nodeType === 1 ? target : target?.parentElement;
   return !!el?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],.drag-num-editor');
 }
+// Space 는 브라우저 미디어 컨트롤보다 먼저 받아 페이지 스크롤/네이티브 토글과 중복되지 않게 한다.
+window.addEventListener('keydown', e => {
+  if (_scRebinding || e.isComposing || !matchSC('play-pause', e) ||
+      _playerKeyboardEntryTarget(e.target) || _playerKeyboardEntryTarget(document.activeElement)) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (!e.repeat) togglePlayPause();
+}, true);
 function _onRebindKey(e) {
   if (!_scRebinding) return;
   if (_playerKeyboardEntryTarget(e.target) || _playerKeyboardEntryTarget(document.activeElement)) return;
@@ -2066,6 +2129,8 @@ let initialSubIndex = -1; // 반복 시작 지점 저장
 let loopMode = 'none'; // 'none' / 'sub' / 'all' / 'range'
 let loopRewinding = false;
 let loopRewindReleaseGeneration = 0;
+let nativeControlsQuietTimer = null;
+let nativeControlsQuietForTts = false;
 let rangeStart = null;      // 구간반복 시작점 (초)
 let rangeEnd = null;        // 구간반복 끝점 (초)
 let rangeLoopEnabled = false; // 구간반복 토글 (loopMode와 독립)
@@ -4166,6 +4231,10 @@ function loadVideo(i, preserveLoopMode = false){
         subtitles=parseSRT(srtText);
         editor.value=srtText;
         renderSubs();
+        const rawCueLineCount = String(srtText || '').split(/\r?\n/).filter(line => /-->/.test(line)).length;
+        if (subtitles.length < rawCueLineCount){
+          showTimeDisplay(`⚠ 자막 인식 ${subtitles.length}/${rawCueLineCount}개 · ${srtFile.name || 'SRT'}`, 6500);
+        }
         _videoSubtitleReady = true;
         const restoredVideoOptions = _applyPendingVideoLoopSnapshot(item);
         if(!restoredVideoOptions && preserveLoopMode && loopMode === 'all' && subtitles.length > 0){
@@ -4261,10 +4330,49 @@ function parseSubtitleWithStyles(text) {
   };
 }
 
+function parseSRTTimestamp(value){
+  const text = String(value == null ? '' : value).trim();
+  let hours = 0, minutes = 0, seconds = 0, fraction = '';
+
+  // 일부 내보내기 파일은 첫 cue에만 `00:00:`을 중복해 붙인다.
+  // 예: `00:00:05:16,876`은 뒤의 `05:16,876`(5분 16.876초)로 읽는다.
+  const prefixedMmSs = text.match(/^(\d{1,2}):(\d{1,2}):(\d{1,2}):(\d{1,2})(?:[,.](\d{1,6}))?$/);
+  if (prefixedMmSs && Number(prefixedMmSs[1]) === 0 && Number(prefixedMmSs[2]) === 0){
+    minutes = Number(prefixedMmSs[3]);
+    seconds = Number(prefixedMmSs[4]);
+    fraction = prefixedMmSs[5] || '';
+  } else {
+    // 표준 HH:MM:SS와 짧은 MM:SS 표기 모두 허용한다. 소수점 자릿수는
+    // 1~6자리이며 1·2자리는 초 단위 소수로 정규화한다.
+    const match = text.match(/^(?:(\d+):)?(\d{1,2}):(\d{1,2})(?:[,.](\d{1,6}))?$/);
+    if (!match) return null;
+    hours = Number(match[1] || 0);
+    minutes = Number(match[2]);
+    seconds = Number(match[3]);
+    fraction = match[4] || '';
+    if (match[1] && minutes > 59) return null;
+  }
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds) || seconds > 59) return null;
+  const milliseconds = Number((fraction + '000').slice(0, 3));
+  return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+}
+
+function parseSRTTimeLine(line){
+  const match = String(line == null ? '' : line).trim().match(/^(.+?)\s*-->\s*(.+?)$/);
+  if (!match) return null;
+  const start = parseSRTTimestamp(match[1]);
+  const end = parseSRTTimestamp(match[2]);
+  if (start == null || end == null) return null;
+  return { start, end };
+}
+
+function countSRTTimeLines(data){
+  return String(data == null ? '' : data).replace(/^\uFEFF/, '').split(/\r?\n/)
+    .filter(line => parseSRTTimeLine(line)).length;
+}
+
 function parseSRT(data){
-  // 시간 줄을 기준으로 분할 (모든 형식 지원)
-  const timeLineRegex = /(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})/;
-  const lines = data.split('\n');
+  const lines = String(data == null ? '' : data).replace(/^\uFEFF/, '').split(/\r?\n/);
   const subtitles = [];
   
   let currentSub = null;
@@ -4273,8 +4381,8 @@ function parseSRT(data){
   lines.forEach((line, idx) => {
     const trimmedLine = line.trim();
     
-    // 시간 줄 감지
-    const timeMatch = trimmedLine.match(timeLineRegex);
+    // 시간 줄 감지: HH:MM:SS,mmm, MM:SS,ms, 소수 자릿수 변형을 함께 처리한다.
+    const timeMatch = parseSRTTimeLine(trimmedLine);
     if (timeMatch) {
       // 이전 자막 저장
       if (currentSub && currentSub.text.trim()) {
@@ -4289,19 +4397,9 @@ function parseSRT(data){
       }
       
       // 새 자막 시작
-      const startH = parseInt(timeMatch[1], 10);
-      const startM = parseInt(timeMatch[2], 10);
-      const startS = parseInt(timeMatch[3], 10);
-      const startMs = parseInt(timeMatch[4], 10);
-      
-      const endH = parseInt(timeMatch[5], 10);
-      const endM = parseInt(timeMatch[6], 10);
-      const endS = parseInt(timeMatch[7], 10);
-      const endMs = parseInt(timeMatch[8], 10);
-      
       currentSub = {
-        start: startH*3600 + startM*60 + startS + startMs/1000,
-        end: endH*3600 + endM*60 + endS + endMs/1000,
+        start: timeMatch.start,
+        end: timeMatch.end,
         text: ''
       };
     } else if (currentSub) {
@@ -4699,10 +4797,33 @@ function markLoopCueSeek(index, targetTime) {
   if ((loopMode !== 'sub' && loopMode !== 'all') ||
       !Number.isInteger(index) || index < 0 || index >= subtitles.length ||
       !Number.isFinite(targetTime)) return;
+  const willSeek = Math.abs(video.currentTime - targetTime) > 0.001;
+  if (willSeek) quietNativeControlsAfterLoopSeek();
   setLoopCueSelection(index);
-  pendingLoopCueSeek = Math.abs(video.currentTime - targetTime) > 0.001
+  pendingLoopCueSeek = willSeek
     ? { index, targetTime, awaitingSeeking: true, awaitingSeeked: false }
     : null;
+}
+
+// 반복 seek/TTS 정지 때 브라우저 미디어 바가 재등장해 깜박이지 않도록 표시만 잠시 감춘다.
+function syncNativeControlsQuiet() {
+  const container = document.getElementById('videoContainer');
+  if (!container) return;
+  container.classList.toggle('vp-native-controls-quiet', nativeControlsQuietForTts || nativeControlsQuietTimer !== null);
+}
+function setNativeControlsQuiet(active) {
+  nativeControlsQuietForTts = !!active;
+  syncNativeControlsQuiet();
+}
+function quietNativeControlsAfterLoopSeek(releaseAfterMs = 2600) {
+  if (nativeControlsQuietTimer !== null) {
+    clearTimeout(nativeControlsQuietTimer);
+  }
+  nativeControlsQuietTimer = setTimeout(() => {
+    nativeControlsQuietTimer = null;
+    syncNativeControlsQuiet();
+  }, releaseAfterMs);
+  syncNativeControlsQuiet();
 }
 
 // 오래된 타이머가 새 rewind 보호를 일찍 풀지 못하도록 세대 번호를 묶는다.
@@ -5250,7 +5371,7 @@ function playCharTts(ch) {
   const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(ch)}&tl=zh-CN&client=gtx&ttsspeed=1`;
   if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
   ttsAudio = new Audio(url);
-  ttsAudio.volume = getTtsOutputVolume(); // 전역 메인 볼륨에 종속
+  vpSetMediaVolume(ttsAudio, getTtsOutputVolume()); // 전역 메인 볼륨에 종속
   ttsAudio.play().catch(() => {});
 }
 
@@ -5567,7 +5688,7 @@ function playTTS(text) {
   const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=gtx&ttsspeed=1`;
   if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
   ttsAudio = new Audio(url);
-  ttsAudio.volume = getTtsOutputVolume(); // 전역 메인 볼륨에 종속
+  vpSetMediaVolume(ttsAudio, getTtsOutputVolume()); // 전역 메인 볼륨에 종속
   ttsAudio.play().catch(() => {
     // CORS 차단 시 구글 번역 탭으로 폴백
     window.open(`https://translate.google.com/?hl=ko&sl=auto&tl=ko&text=${encodeURIComponent(text)}&op=translate`, '_blank');
@@ -7341,7 +7462,7 @@ function _applySettingsSnapshot(s) {
   if (Number.isFinite(s.ttsPreZhCount) && s.ttsPreZhCount > 0) ttsPreZhCount = s.ttsPreZhCount;
   if (Number.isFinite(s.ttsPostZhCount) && s.ttsPostZhCount > 0) ttsPostZhCount = s.ttsPostZhCount;
   if (typeof s.ttsKoUseSubtitle === 'boolean') ttsKoUseSubtitle = s.ttsKoUseSubtitle;
-  if (Number.isFinite(s.mainVolume) && s.mainVolume >= 0 && s.mainVolume <= 1) mainVolume = s.mainVolume;
+  if (Number.isFinite(s.mainVolume) && s.mainVolume >= 0 && s.mainVolume <= VP_VOLUME_MAX) mainVolume = s.mainVolume;
   if (typeof s.muted === 'boolean') video.muted = s.muted;
   if (typeof s.skipGaps === 'boolean') skipGaps = s.skipGaps;
   if (typeof s.sequentialSlowdownEnabled === 'boolean') sequentialSlowdownEnabled = s.sequentialSlowdownEnabled;
@@ -7687,6 +7808,7 @@ function setTtsPostZhCountFromDrag(v) {
 
 function updateTtsUI() {
   try { saveSettings(); } catch(_) {}
+  setNativeControlsQuiet(inTtsPhase && ttsLoopMode === 'pause');
   const btnLoop  = document.getElementById('btn-ttsLoop');
   const btnZh    = document.getElementById('btn-ttsZh');
   const btnKo    = document.getElementById('btn-ttsKo');
@@ -7855,7 +7977,7 @@ function playTtsSequence(items, index, afterDone) {
   if (ttsPhaseAudio) { ttsPhaseAudio.pause(); ttsPhaseAudio = null; }
   ttsPhaseAudio = new Audio(url);
   // TTS 음량은 전역 메인 볼륨에 종속 (덕킹과 무관하게 원래 크기로 발화)
-  ttsPhaseAudio.volume = getTtsOutputVolume();
+  vpSetMediaVolume(ttsPhaseAudio, getTtsOutputVolume());
   // 안전 가드: onended/onerror/play().catch/timeout 중 하나만 효과 발생 — 중복 advance 차단
   let segConsumed = false;
   const onSegDone = () => {
@@ -8057,7 +8179,7 @@ async function applyEdit(event){
   }
   const srtText = String(editor.value || '');
   const parsed = parseSRT(srtText.replace(/^\uFEFF/, ''));
-  const timeLineCount = (srtText.match(/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/g) || []).length;
+  const timeLineCount = countSRTTimeLines(srtText);
   if (!parsed.length || parsed.length !== timeLineCount || parsed.some(sub => !Number.isFinite(sub.start) || !Number.isFinite(sub.end) || sub.end <= sub.start)) {
     showTimeDisplay('모든 자막 구간을 올바르게 읽지 못했습니다. 편집 내용을 확인했으며 파일은 변경하지 않았습니다.', 6500);
     return false;
@@ -10992,6 +11114,8 @@ function updateBottomFloatUI() {
   const txt = (id, t) => { const b = document.getElementById(id); if(b) b.textContent = t; };
   txt('bf-ttsMode',  ttsLoopMode === 'overlap' ? '🎞 오버랩' : '⏸ 일시정지');
   txt('bf-vol',      Math.round(mainVolume * 100) + '%');
+  const volumeSlider = document.getElementById('mainVolumeSlider');
+  if (volumeSlider && document.activeElement !== volumeSlider) volumeSlider.value = String(Math.round(mainVolume * 100));
   txt('bf-repeat-val', '반복 ' + repeatTimes);
   txt('bf-speed',    'x' + baseSpeed.toFixed(1));
   txt('bf-minspeed', '최저' + minPlaybackSpeed.toFixed(2));
@@ -11658,7 +11782,7 @@ function installVideoTouchGestures() {
     if (gesture.kind === 'volume') {
       const rawVolume = gesture.baseVolume - dy / 1000;
       const boundedVolume = gesture.zone === 'upper'
-        ? Math.max(gesture.baseVolume, Math.min(1, rawVolume))
+        ? Math.max(gesture.baseVolume, Math.min(VP_VOLUME_MAX, rawVolume))
         : Math.min(gesture.baseVolume, Math.max(0, rawVolume));
       const nextVolume = Math.round(boundedVolume * 100) / 100;
       if (nextVolume !== mainVolume) {
