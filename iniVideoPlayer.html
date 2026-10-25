@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C355';
+document.documentElement.dataset.vpBuild = 'C356';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -10469,40 +10469,50 @@ function updateTopFloatUI() {
 // ===== 하단 플로팅 패널 =====
 let bottomFloatOpen = false;
 let bottomFloatHoverOpen = false;
-let bottomFloatOpenedByShift = false;
+let bottomFloatShiftHoverOpen = false;
+let bottomFloatShiftHoverDismissed = false;
 let bottomFloatFullscreenPlaceholder = null;
 function syncBottomFloatPanel() {
   const panel = document.getElementById('bottomFloatPanel');
   const tab = document.getElementById('bottomFloatTab');
   if (!panel || !tab) return;
-  const isOpen = bottomFloatOpen || bottomFloatHoverOpen;
+  const isOpen = bottomFloatOpen || bottomFloatHoverOpen || bottomFloatShiftHoverOpen;
   panel.classList.toggle('panel-open', isOpen);
-  tab.textContent = isOpen ? (bottomFloatOpenedByShift ? '▼ 전체 컨트롤' : '▼ 컨트롤') : '▲ 컨트롤';
+  tab.textContent = isOpen ? (bottomFloatShiftHoverOpen ? '▼ 전체 컨트롤' : '▼ 컨트롤') : '▲ 컨트롤';
   if (isOpen) updateBottomFloatUI();
 }
 function toggleBottomFloat() {
+  if (bottomFloatShiftHoverOpen && !bottomFloatOpen) {
+    closeBottomFloatForShiftHover(true);
+    return;
+  }
   if (bottomFloatOpen || bottomFloatHoverOpen) {
     bottomFloatOpen = false;
     bottomFloatHoverOpen = false;
-    bottomFloatOpenedByShift = false;
   } else {
     bottomFloatOpen = true;
   }
   syncBottomFloatPanel();
 }
 function openBottomFloatForShiftHover(eventTarget) {
-  if (!playerControlsShiftHeld || audioOnlyMode || (eventTarget instanceof Element && eventTarget.closest('#bottomFloatPanel'))) return false;
+  if (!playerControlsShiftHeld || bottomFloatShiftHoverDismissed || audioOnlyMode || (eventTarget instanceof Element && eventTarget.closest('#bottomFloatPanel'))) return false;
   const container = document.getElementById('videoContainer');
   if (!container) return false;
   const rect = container.getBoundingClientRect();
   const pointer = overlayInteractionPointer;
   const pointerInside = container.matches(':hover') || (pointer && pointer.x >= rect.left && pointer.x <= rect.right && pointer.y >= rect.top && pointer.y <= rect.bottom);
   if (!pointerInside) return false;
-  if (bottomFloatOpen && bottomFloatOpenedByShift) return true;
-  bottomFloatOpen = true;
-  bottomFloatOpenedByShift = true;
+  if (bottomFloatShiftHoverOpen) return true;
+  bottomFloatShiftHoverOpen = true;
   syncBottomFloatPanel();
   return true;
+}
+function closeBottomFloatForShiftHover(dismissUntilRelease = false) {
+  const wasOpen = bottomFloatShiftHoverOpen;
+  bottomFloatShiftHoverOpen = false;
+  if (wasOpen) bottomFloatHoverOpen = false;
+  bottomFloatShiftHoverDismissed = !!dismissUntilRelease;
+  if (wasOpen || dismissUntilRelease) syncBottomFloatPanel();
 }
 function syncBottomFloatFullscreenPlacement() {
   const panel = document.getElementById('bottomFloatPanel');
@@ -10527,12 +10537,9 @@ function syncBottomFloatFullscreenPlacement() {
 document.addEventListener('fullscreenchange', syncBottomFloatFullscreenPlacement);
 document.addEventListener('webkitfullscreenchange', syncBottomFloatFullscreenPlacement);
 window.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || !bottomFloatOpenedByShift) return;
+  if (event.key !== 'Escape' || !bottomFloatShiftHoverOpen) return;
   if (event.target instanceof Element && event.target.matches('input,select,textarea,[contenteditable="true"]')) return;
-  bottomFloatOpen = false;
-  bottomFloatHoverOpen = false;
-  bottomFloatOpenedByShift = false;
-  syncBottomFloatPanel();
+  closeBottomFloatForShiftHover(true);
 }, true);
 function installBottomFloatHoverControls() {
   const panel = document.getElementById('bottomFloatPanel');
@@ -10648,6 +10655,17 @@ function _updateAudioModeTitle() {
 
 // ===== Ctrl hover: 선택 레이어의 직접 표시·정렬 컨트롤 =====
 let playerControlsShiftHeld = false;
+function setPlayerControlsShiftHeld(down) {
+  const wasHeld = playerControlsShiftHeld;
+  playerControlsShiftHeld = !!down;
+  if (!playerControlsShiftHeld) {
+    bottomFloatShiftHoverDismissed = false;
+    closeBottomFloatForShiftHover(false);
+  } else {
+    if (!wasHeld) bottomFloatShiftHoverDismissed = false;
+    openBottomFloatForShiftHover();
+  }
+}
 let overlayInteractionCtrlHeld = false;
 let overlayInteractionPointer = null;
 let overlayInteractionToolbarKey = '';
@@ -10906,6 +10924,7 @@ function installPlayerModifierInteraction() {
   let modifierPointerFrame=0, modifierPointerPending=null;
   container.addEventListener('pointermove',event=>{
     if(event.pointerType==='touch')return;
+    if(event.shiftKey&&!playerControlsShiftHeld)setPlayerControlsShiftHeld(true);
     if(event.shiftKey||playerControlsShiftHeld)openBottomFloatForShiftHover(event.target);
     const overlayControl=event.target instanceof Element?event.target.closest('.overlay-inline-controls'):null;
     overlayInteractionToolbarKey=overlayControl?.dataset.overlayOptionKey||'';
@@ -10961,24 +10980,23 @@ function installPlayerModifierInteraction() {
 
   const handleModifier=event=>{
     const down=event.type==='keydown';
-    if(event.key==='Shift'||event.code==='ShiftLeft'||event.code==='ShiftRight'){playerControlsShiftHeld=down;if(down)openBottomFloatForShiftHover(event.target);}
+    if(event.key==='Shift'||event.code==='ShiftLeft'||event.code==='ShiftRight'){setPlayerControlsShiftHeld(down ? true : event.shiftKey);}
     else if(event.key==='Control'||event.code==='ControlLeft'||event.code==='ControlRight')overlayInteractionCtrlHeld=down;
     else return;
     updateOverlayCtrlTarget();
   };
   window.addEventListener('keydown',handleModifier,true);
   window.addEventListener('keyup',handleModifier,true);
-  window.addEventListener('blur',()=>{playerControlsShiftHeld=false;overlayInteractionCtrlHeld=false;updateOverlayCtrlTarget();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){playerControlsShiftHeld=false;overlayInteractionCtrlHeld=false;updateOverlayCtrlTarget();}});
+  window.addEventListener('blur',()=>{setPlayerControlsShiftHeld(false);overlayInteractionCtrlHeld=false;updateOverlayCtrlTarget();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){setPlayerControlsShiftHeld(false);overlayInteractionCtrlHeld=false;updateOverlayCtrlTarget();}});
 
 
   window.addEventListener('message',event=>{
     if(event.source!==window.parent)return;
     const message=event.data;
     if(!message||message.llt!=='vp-player-controls-modifier-state')return;
-    playerControlsShiftHeld=message.down===true;
+    setPlayerControlsShiftHeld(message.down===true);
     overlayInteractionCtrlHeld=message.ctrlDown===true;
-    if(playerControlsShiftHeld)openBottomFloatForShiftHover();
     updateOverlayCtrlTarget();
   });
   updateOverlayCtrlTarget();
@@ -11381,7 +11399,7 @@ function applyTabletLayout2() {
 
 // 볼륨 변경 시 하단 패널 업데이트
 video.addEventListener('volumechange', () => {
-  if (bottomFloatOpen) {
+  if (bottomFloatOpen || bottomFloatHoverOpen || bottomFloatShiftHoverOpen) {
     const bv = document.getElementById('bf-vol');
     // 표시값은 메인 볼륨 기준 — TTS 덕킹으로 video.volume 이 일시적으로 낮아져도 흔들리지 않음
     if (bv) bv.textContent = Math.round(mainVolume * 100) + '%';
