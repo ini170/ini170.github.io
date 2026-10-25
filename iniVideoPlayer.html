@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C358';
+document.documentElement.dataset.vpBuild = 'C359';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -814,42 +814,63 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { display:flex; }
 #videoContainer:fullscreen,#videoContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; max-width:100vw !important; max-height:100vh !important; flex:none !important; border:0 !important; border-radius:0 !important; background:#000 !important; }
 #videoContainer:fullscreen > video,#videoContainer:-webkit-full-screen > video { width:100% !important; height:100% !important; object-fit:contain; }
+#videoContainer.shift-hover-panel-open { touch-action:pan-y; }
+#leftPanel.shift-controls-detached #resizeDictControl { display:none !important; }
 #videoContainer:fullscreen > #bottomFloatPanel,#videoContainer:-webkit-full-screen > #bottomFloatPanel { position:absolute; left:50%; bottom:0; transform:translateX(-50%); z-index:1005; }
 #videoContainer:fullscreen #bottomFloatContent,#videoContainer:-webkit-full-screen #bottomFloatContent { max-height:min(70vh,calc(100vh - 42px)); }
-/* Shift hover keeps the unified controls inside the video frame. */
-#bottomFloatPanel.shift-hover-controls {
-  position:absolute;
-  top:12px;
-  right:12px;
-  bottom:12px;
-  left:auto;
-  width:min(520px,calc(100% - 24px));
-  max-width:calc(100% - 24px);
-  transform:none;
-  z-index:1010;
-  align-items:stretch;
+/* Shift hover opens one neutral, movable full-settings surface inside the video. */
+#bottomFloatPanel.shift-floating-active { visibility:hidden !important; pointer-events:none !important; }
+#shiftHoverPanel {
+  position:absolute; z-index:1200; top:12px; right:12px;
+  display:flex; flex-direction:column; box-sizing:border-box;
+  width:min(620px,calc(100% - 24px)); height:min(720px,calc(100% - 24px));
+  max-width:calc(100% - 24px); max-height:calc(100% - 24px);
+  min-width:min(280px,calc(100% - 24px)); min-height:min(180px,calc(100% - 24px));
+  overflow:hidden; resize:both; container-type:inline-size;
+  color:#ddd; background:rgba(24,24,25,.98); border:1px solid #55565a; border-radius:7px;
+  box-shadow:0 8px 24px rgba(0,0,0,.48);
 }
-#bottomFloatPanel.shift-hover-controls #bottomFloatTab { display:none; }
-#bottomFloatPanel.shift-hover-controls #bottomFloatContent,
-#bottomFloatPanel.shift-hover-controls.panel-open #bottomFloatContent {
-  display:block;
-  order:0;
-  box-sizing:border-box;
-  width:100%;
-  max-width:none;
-  min-height:0;
-  height:100%;
-  max-height:none;
-  overflow-y:auto;
-  border-radius:8px;
+#shiftHoverPanel[hidden] { display:none !important; }
+#shiftHoverPanelHeader {
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex:0 0 auto;
+  min-height:38px; padding:5px 8px 5px 12px; box-sizing:border-box;
+  color:#dedee0; background:#29292b; border-bottom:1px solid #48484b;
+  cursor:move; user-select:none; touch-action:none;
 }
-#videoContainer:fullscreen > #bottomFloatPanel.shift-hover-controls,
-#videoContainer:-webkit-full-screen > #bottomFloatPanel.shift-hover-controls {
-  top:12px;
-  right:12px;
-  bottom:12px;
-  left:auto;
-  transform:none;
+#shiftHoverPanelTitle { font-size:12px; font-weight:700; letter-spacing:.02em; }
+#shiftHoverPanelHint { margin-left:auto; color:#929296; font-size:10px; }
+#shiftHoverPanelClose {
+  flex:0 0 28px; width:28px; height:28px; padding:0; border:1px solid #55565a; border-radius:4px;
+  color:#c5c5c8; background:#353538; cursor:pointer; font-size:17px; line-height:1;
+}
+#shiftHoverPanelClose:hover { color:#fff; background:#454548; }
+#shiftHoverPanelBody { flex:1 1 0; min-height:0; overflow:auto; padding:8px; box-sizing:border-box; overscroll-behavior:contain; touch-action:pan-y; }
+#shiftHoverPanel #controlsSection {
+  display:block; flex:0 0 auto !important; width:100%; min-height:0 !important; height:auto !important;
+  max-height:none !important; overflow:visible !important; box-sizing:border-box;
+  padding:2px !important; border:0 !important; border-radius:4px !important; background:transparent !important;
+}
+#shiftHoverPanel #controlsSection > div:first-child { display:none !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(2) { border-left-color:#777 !important; }
+#shiftHoverPanel #controlsSection button.active { color:#fff !important; background:#49494d !important; border-color:#77787d !important; }
+#shiftHoverPanel #controlsSection [style*="#4fc3f7"] { color:#bdbdc0 !important; }
+#shiftHoverPanel input[type="range"] { accent-color:#a5a5a9 !important; }
+#shiftHoverPanel .bfp-section { margin:8px 0 0; padding:8px; border:1px solid #444447; border-radius:5px; background:#202022; }
+#shiftHoverPanel .bfp-section-title { color:#b6b6b9; font-size:10px; letter-spacing:.04em; }
+#shiftHoverPanel .bfp-btn { color:#d2d2d5; background:#303033; border-color:#55565a; }
+#shiftHoverPanel .bfp-btn:hover { color:#fff; background:#3c3c40; }
+#shiftHoverPanel .bfp-btn.active { color:#fff; background:#49494d; border-color:#77787d; }
+#shiftHoverPanel .bfp-preset { color:#d2d2d5; background:#303033; border-color:#55565a; }
+#shiftHoverPanel .bfp-preset:hover { background:#3c3c40; }
+#shiftHoverPanel .overlay-scale-controls { margin-top:4px; }
+#shiftHoverPanel .overlay-scale-value { color:#ddd; background:#29292b; border-color:#55565a; }
+#shiftHoverPanel .overlay-scale-slider:focus-visible { outline-color:#aaa; }
+#shiftHoverPanel .overlay-position-row output { color:#ccc; }
+@container (max-width:480px) {
+  #shiftHoverPanel .overlay-scale-controls { grid-template-columns:minmax(0,1fr); }
+  #shiftHoverPanel #controlsSection > div:nth-child(3) { flex-wrap:wrap !important; }
+  #shiftHoverPanel #controlsSection > div:nth-child(7) > div,
+  #shiftHoverPanel #controlsSection > div:nth-child(8) > div { flex-wrap:wrap !important; }
 }
 /* ===== 오디오 전용 모드 바 ===== */
 
@@ -1027,6 +1048,46 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       </div>
       <!-- 한자 영상 위 오버레이 (상단 고정) -->
       <div id="hanziVideoOverlay"></div>
+      <!-- Shift 호버 전용: 하단 탭 대신 전체 플레이어 설정을 담는 영상 내부 플로팅 창 -->
+      <section id="shiftHoverPanel" role="dialog" aria-label="플레이어 전체 설정" aria-hidden="true" hidden>
+        <header id="shiftHoverPanelHeader">
+          <span id="shiftHoverPanelTitle">플레이어 전체 설정</span>
+          <span id="shiftHoverPanelHint">Shift 호버 · 드래그 이동 · 모서리 크기 조절</span>
+          <button id="shiftHoverPanelClose" type="button" aria-label="설정 창 닫기" title="닫기 · Shift 해제 전까지 숨김" onclick="closeShiftHoverControlPanel(true)">×</button>
+        </header>
+        <div id="shiftHoverPanelBody">
+          <div id="shiftHoverCoreHost"></div>
+          <div class="bfp-section" id="shiftHoverUtilitySection">
+            <div class="bfp-section-title">재생·화면 빠른 조작</div>
+            <div class="bfp-row">
+              <button class="bfp-btn" type="button" onclick="video.currentTime=Math.max(0,video.currentTime-5)">↩ −5초</button>
+              <button class="bfp-btn" id="shift-hover-skip" type="button" onclick="shiftHoverToggleSkipGaps()">⏭ 공백 건너뛰기</button>
+              <button class="bfp-btn" type="button" onclick="video.currentTime=Math.min(video.duration||video.currentTime,video.currentTime+5)">+5초 ↪</button>
+            </div>
+            <div class="bfp-row">
+              <button class="bfp-btn" type="button" onclick="stepFrame(-1)">◀ 이전 프레임</button>
+              <button class="bfp-btn" id="shift-hover-fps" type="button" disabled>30fps</button>
+              <button class="bfp-btn" type="button" onclick="stepFrame(1)">다음 프레임 ▶</button>
+            </div>
+            <div class="bfp-row">
+              <button class="bfp-btn" type="button" onclick="adjustMainVolume(-0.1);updateShiftHoverPanelUI()">🔉 음량 −10%</button>
+              <button class="bfp-btn" id="shift-hover-volume" type="button" disabled>30%</button>
+              <button class="bfp-btn" type="button" onclick="adjustMainVolume(0.1);updateShiftHoverPanelUI()">🔊 음량 +10%</button>
+            </div>
+            <div class="bfp-row">
+              <button class="bfp-btn" id="shift-hover-trans" type="button" onclick="toggleTransPanel();updateShiftHoverPanelUI()">🌐 번역 패널</button>
+              <button class="bfp-btn" id="shift-hover-dict" type="button" onclick="toggleCharDictPanel();updateShiftHoverPanelUI()">📖 한자 패널</button>
+              <button class="bfp-btn" id="shift-hover-side" type="button" onclick="toggleSidePanel();updateShiftHoverPanelUI()">📋 사이드 패널</button>
+              <button class="bfp-btn" id="shift-hover-audio" type="button" onclick="shiftHoverToggleAudioOnly()">🔊 오디오 전용</button>
+            </div>
+          </div>
+          <div id="shiftHoverLayoutHost"></div>
+          <div class="bfp-section" id="shiftHoverOverlaySection">
+            <div class="bfp-section-title">영상 위 자막·번역·한자 표시 조정</div>
+            <div id="shiftHoverOverlayHost"></div>
+          </div>
+        </div>
+      </section>
     </div>
     
     <!-- 오디오 전용 모드 바 -->
@@ -1340,7 +1401,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   <div id="bottomFloatContent">
 
     <!-- 레이아웃 프리셋 -->
-    <div class="bfp-section">
+    <div class="bfp-section" id="bottomFloatLayoutSection">
       <div class="bfp-section-title">📐 레이아웃 프리셋</div>
       <div class="bfp-row">
         <button class="bfp-btn bfp-preset" onclick="loadLayout(1)">🏠 기본</button>
@@ -1456,7 +1517,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         <button class="bfp-btn" id="bf-audio-only" onclick="toggleAudioOnly()">🔊 오디오전용</button>
       </div>
       <!-- 2행: 영상 위 자막·번역·한자 표시와 방향을 확인할 수 있는 개별 크기 슬라이더 -->
-      <div class="overlay-scale-controls">
+      <div class="overlay-scale-controls" id="bottomFloatOverlayControls">
         <!-- 자막 영상위 -->
         <div class="overlay-scale-card">
           <button class="bfp-btn" id="bf-subov" onclick="toggleSubOverlay();updateBottomFloatUI()" style="width:100%;">🎬 자막영상위</button>
@@ -10502,27 +10563,29 @@ function updateTopFloatUI() {
   set('tf-hanzi-ov',   hanziVideoOverlayEnabled);
 }
 
-// ===== 하단 플로팅 패널 =====
+// ===== Shift 영상 호버: 전체 설정 플로팅 창 =====
 let bottomFloatOpen = false;
 let bottomFloatHoverOpen = false;
-let bottomFloatShiftHoverOpen = false;
-let bottomFloatShiftHoverDismissed = false;
+let shiftHoverControlPanelOpen = false;
+let shiftHoverControlPanelDismissed = false;
 let bottomFloatPanelHomePlaceholder = null;
+const shiftHoverHomeMarkers = new Map();
+let shiftHoverForcedControlsDisplay = null;
+let shiftHoverControlsVisibleAtOpen = null;
 function syncBottomFloatPanel() {
   const panel = document.getElementById('bottomFloatPanel');
   const tab = document.getElementById('bottomFloatTab');
-  if (!panel || !tab) return;
-  const isOpen = bottomFloatOpen || bottomFloatHoverOpen || bottomFloatShiftHoverOpen;
-  panel.classList.toggle('panel-open', isOpen);
-  tab.textContent = isOpen ? (bottomFloatShiftHoverOpen ? '▼ 전체 컨트롤' : '▼ 컨트롤') : '▲ 컨트롤';
+  const isOpen = bottomFloatOpen || bottomFloatHoverOpen;
+  if (panel && tab) {
+    panel.classList.toggle('panel-open', isOpen);
+    panel.classList.toggle('shift-floating-active', shiftHoverControlPanelOpen);
+    tab.textContent = isOpen ? '▼ 컨트롤' : '▲ 컨트롤';
+  }
   syncBottomFloatPanelPlacement();
-  if (isOpen) updateBottomFloatUI();
+  syncShiftHoverControlPanel();
+  if (isOpen || shiftHoverControlPanelOpen) updateBottomFloatUI();
 }
 function toggleBottomFloat() {
-  if (bottomFloatShiftHoverOpen && !bottomFloatOpen) {
-    closeBottomFloatForShiftHover(true);
-    return;
-  }
   if (bottomFloatOpen || bottomFloatHoverOpen) {
     bottomFloatOpen = false;
     bottomFloatHoverOpen = false;
@@ -10531,24 +10594,82 @@ function toggleBottomFloat() {
   }
   syncBottomFloatPanel();
 }
-function openBottomFloatForShiftHover(eventTarget) {
-  if (!playerControlsShiftHeld || bottomFloatShiftHoverDismissed || audioOnlyMode || (eventTarget instanceof Element && eventTarget.closest('#bottomFloatPanel'))) return false;
+function moveShiftHoverNode(nodeId, hostId) {
+  const node = document.getElementById(nodeId);
+  const host = document.getElementById(hostId);
+  if (!node || !host || node.parentElement === host) return;
+  if (!shiftHoverHomeMarkers.has(node) && node.parentNode) {
+    const marker = document.createComment(` ${nodeId} home `);
+    node.parentNode.insertBefore(marker, node);
+    shiftHoverHomeMarkers.set(node, marker);
+  }
+  host.appendChild(node);
+}
+function restoreShiftHoverNode(nodeId) {
+  const node = document.getElementById(nodeId);
+  const marker = node && shiftHoverHomeMarkers.get(node);
+  if (!node || !marker) return;
+  if (marker.parentNode) marker.parentNode.insertBefore(node, marker);
+  marker.remove();
+  shiftHoverHomeMarkers.delete(node);
+}
+function syncShiftHoverControlPanel() {
+  const panel = document.getElementById('shiftHoverPanel');
+  if (!panel) return;
+  const bottomPanel = document.getElementById('bottomFloatPanel');
+  const videoContainer = document.getElementById('videoContainer');
+  const leftPanel = document.getElementById('leftPanel');
+  if (!shiftHoverControlPanelOpen) {
+    videoContainer?.classList.remove('shift-hover-panel-open');
+    leftPanel?.classList.remove('shift-controls-detached');
+    panel.hidden = true;
+    panel.setAttribute('aria-hidden', 'true');
+    restoreShiftHoverNode('controlsSection');
+    restoreShiftHoverNode('bottomFloatLayoutSection');
+    restoreShiftHoverNode('bottomFloatOverlayControls');
+    bottomPanel?.classList.remove('shift-floating-active');
+    const controls = document.getElementById('controlsSection');
+    if (controls && shiftHoverForcedControlsDisplay !== null && controlsSectionVisible === shiftHoverControlsVisibleAtOpen) {
+      controls.style.display = shiftHoverForcedControlsDisplay;
+    }
+    shiftHoverForcedControlsDisplay = null;
+    shiftHoverControlsVisibleAtOpen = null;
+    return;
+  }
+  panel.hidden = false;
+  panel.setAttribute('aria-hidden', 'false');
+  videoContainer?.classList.add('shift-hover-panel-open');
+  leftPanel?.classList.add('shift-controls-detached');
+  bottomPanel?.classList.add('shift-floating-active');
+  const controls = document.getElementById('controlsSection');
+  if (controls && getComputedStyle(controls).display === 'none' && shiftHoverForcedControlsDisplay === null) {
+    shiftHoverForcedControlsDisplay = controls.style.display;
+    shiftHoverControlsVisibleAtOpen = controlsSectionVisible;
+    controls.style.display = 'block';
+  }
+  moveShiftHoverNode('controlsSection', 'shiftHoverCoreHost');
+  moveShiftHoverNode('bottomFloatLayoutSection', 'shiftHoverLayoutHost');
+  moveShiftHoverNode('bottomFloatOverlayControls', 'shiftHoverOverlayHost');
+  updateShiftHoverPanelUI();
+}
+function openShiftHoverControlPanel(eventTarget) {
+  if (!playerControlsShiftHeld || shiftHoverControlPanelDismissed || audioOnlyMode ||
+      (eventTarget instanceof Element && eventTarget.closest('#bottomFloatPanel,#shiftHoverPanel'))) return false;
   const container = document.getElementById('videoContainer');
   if (!container) return false;
   const rect = container.getBoundingClientRect();
   const pointer = overlayInteractionPointer;
   const pointerInside = container.matches(':hover') || (pointer && pointer.x >= rect.left && pointer.x <= rect.right && pointer.y >= rect.top && pointer.y <= rect.bottom);
   if (!pointerInside) return false;
-  if (bottomFloatShiftHoverOpen) return true;
-  bottomFloatShiftHoverOpen = true;
+  if (shiftHoverControlPanelOpen) return true;
+  shiftHoverControlPanelOpen = true;
   syncBottomFloatPanel();
   return true;
 }
-function closeBottomFloatForShiftHover(dismissUntilRelease = false) {
-  const wasOpen = bottomFloatShiftHoverOpen;
-  bottomFloatShiftHoverOpen = false;
-  if (wasOpen) bottomFloatHoverOpen = false;
-  bottomFloatShiftHoverDismissed = !!dismissUntilRelease;
+function closeShiftHoverControlPanel(dismissUntilRelease = false) {
+  const wasOpen = shiftHoverControlPanelOpen;
+  shiftHoverControlPanelOpen = false;
+  shiftHoverControlPanelDismissed = !!dismissUntilRelease;
   if (wasOpen || dismissUntilRelease) syncBottomFloatPanel();
 }
 function syncBottomFloatPanelPlacement() {
@@ -10556,9 +10677,7 @@ function syncBottomFloatPanelPlacement() {
   const container = document.getElementById('videoContainer');
   if (!panel || !container) return;
   const isFullscreen = document.fullscreenElement === container || document.webkitFullscreenElement === container;
-  const showInsideVideo = isFullscreen || bottomFloatShiftHoverOpen;
-  panel.classList.toggle('shift-hover-controls', bottomFloatShiftHoverOpen);
-  if (showInsideVideo) {
+  if (isFullscreen) {
     if (panel.parentElement !== container) {
       if (panel.parentNode && !bottomFloatPanelHomePlaceholder) {
         bottomFloatPanelHomePlaceholder = document.createComment(' bottomFloatPanel home ');
@@ -10574,12 +10693,92 @@ function syncBottomFloatPanelPlacement() {
     bottomFloatPanelHomePlaceholder = null;
   }
 }
+function updateShiftHoverPanelUI() {
+  const set = (id, on) => document.getElementById(id)?.classList.toggle('active', !!on);
+  const text = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  set('shift-hover-skip', skipGaps);
+  set('shift-hover-trans', document.getElementById('translationPanel')?.style.display !== 'none');
+  set('shift-hover-dict', charDictVisible);
+  set('shift-hover-side', sidePanelVisible);
+  set('shift-hover-audio', audioOnlyMode);
+  text('shift-hover-volume', Math.round(mainVolume * 100) + '%');
+  text('shift-hover-fps', frameRate + 'fps');
+}
+function shiftHoverToggleSkipGaps() {
+  skipGaps = !skipGaps;
+  updateLoopStatus();
+  updateBottomFloatUI();
+  if (skipGaps) triggerSkipGap(true);
+  updateShiftHoverPanelUI();
+}
+function shiftHoverToggleAudioOnly() {
+  toggleAudioOnly();
+  updateShiftHoverPanelUI();
+}
+function installShiftHoverPanelInteractions() {
+  const panel = document.getElementById('shiftHoverPanel');
+  const header = document.getElementById('shiftHoverPanelHeader');
+  const container = document.getElementById('videoContainer');
+  if (!panel || !header || !container || panel.dataset.interactionReady === '1') return;
+  panel.dataset.interactionReady = '1';
+  let drag = null;
+  const clampDraggedPanel = () => {
+    if (panel.hidden || panel.style.left === '') return;
+    const maxLeft = Math.max(0,container.clientWidth-panel.offsetWidth);
+    const maxTop = Math.max(0,container.clientHeight-panel.offsetHeight);
+    const left = Number.parseFloat(panel.style.left) || 0;
+    const top = Number.parseFloat(panel.style.top) || 0;
+    panel.style.left = Math.max(0,Math.min(maxLeft,left)) + 'px';
+    panel.style.top = Math.max(0,Math.min(maxTop,top)) + 'px';
+  };
+  if (typeof ResizeObserver === 'function') {
+    const shiftPanelResizeObserver = new ResizeObserver(clampDraggedPanel);
+    shiftPanelResizeObserver.observe(container);
+    shiftPanelResizeObserver.observe(panel);
+    panel._shiftPanelResizeObserver = shiftPanelResizeObserver;
+  }
+  const finishDrag = event => {
+    if (!drag || (event && event.pointerId !== drag.pointerId)) return;
+    const pointerId = drag.pointerId;
+    drag = null;
+    try { if (header.hasPointerCapture(pointerId)) header.releasePointerCapture(pointerId); } catch (_) {}
+  };
+  header.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || event.target instanceof Element && event.target.closest('button,input,select,textarea,a')) return;
+    const frame = container.getBoundingClientRect();
+    const rect = panel.getBoundingClientRect();
+    drag = { pointerId:event.pointerId, offsetX:event.clientX-rect.left, offsetY:event.clientY-rect.top };
+    panel.style.left = Math.max(0,rect.left-frame.left) + 'px';
+    panel.style.top = Math.max(0,rect.top-frame.top) + 'px';
+    panel.style.right = 'auto';
+    try { header.setPointerCapture(event.pointerId); } catch (_) {}
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  header.addEventListener('pointermove', event => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const frame = container.getBoundingClientRect();
+    const maxLeft = Math.max(0,container.clientWidth-panel.offsetWidth);
+    const maxTop = Math.max(0,container.clientHeight-panel.offsetHeight);
+    panel.style.left = Math.max(0,Math.min(maxLeft,event.clientX-frame.left-drag.offsetX)) + 'px';
+    panel.style.top = Math.max(0,Math.min(maxTop,event.clientY-frame.top-drag.offsetY)) + 'px';
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  header.addEventListener('pointerup', finishDrag);
+  header.addEventListener('pointercancel', finishDrag);
+  header.addEventListener('lostpointercapture', finishDrag);
+  panel.addEventListener('pointerdown', event => event.stopPropagation());
+  panel.addEventListener('click', event => event.stopPropagation());
+  panel.addEventListener('wheel', event => event.stopPropagation(), {passive:true});
+  window.addEventListener('blur', () => finishDrag(null));
+}
 document.addEventListener('fullscreenchange', syncBottomFloatPanelPlacement);
 document.addEventListener('webkitfullscreenchange', syncBottomFloatPanelPlacement);
 window.addEventListener('keydown', event => {
-  if (event.key !== 'Escape' || !bottomFloatShiftHoverOpen) return;
+  if (event.key !== 'Escape' || !shiftHoverControlPanelOpen) return;
   if (event.target instanceof Element && event.target.matches('input,select,textarea,[contenteditable="true"]')) return;
-  closeBottomFloatForShiftHover(true);
+  closeShiftHoverControlPanel(true);
 }, true);
 function installBottomFloatHoverControls() {
   const panel = document.getElementById('bottomFloatPanel');
@@ -10641,6 +10840,7 @@ function updateBottomFloatUI() {
   txt('bf-fps',      frameRate + 'fps');
   txt('bf-seq-min',    '최저' + minPlaybackSpeed.toFixed(2));
   txt('bf-seq-target', '목표 ' + targetRepeatCount + '회');
+  updateShiftHoverPanelUI();
 }
 function updateRepeatUI() {
   const el = document.getElementById('repeatDrag');
@@ -10655,6 +10855,7 @@ let _savedVideoFlex = null;
 
 function toggleAudioOnly() {
   audioOnlyMode = !audioOnlyMode;
+  if (audioOnlyMode && shiftHoverControlPanelOpen) closeShiftHoverControlPanel(false);
   const vc       = document.getElementById('videoContainer');
   const bar      = document.getElementById('audioModeBar');
   const resizer  = document.getElementById('resizeVideoTimeline');
@@ -10699,11 +10900,11 @@ function setPlayerControlsShiftHeld(down) {
   const wasHeld = playerControlsShiftHeld;
   playerControlsShiftHeld = !!down;
   if (!playerControlsShiftHeld) {
-    bottomFloatShiftHoverDismissed = false;
-    closeBottomFloatForShiftHover(false);
+    shiftHoverControlPanelDismissed = false;
+    closeShiftHoverControlPanel(false);
   } else {
-    if (!wasHeld) bottomFloatShiftHoverDismissed = false;
-    openBottomFloatForShiftHover();
+    if (!wasHeld) shiftHoverControlPanelDismissed = false;
+    openShiftHoverControlPanel();
   }
 }
 let overlayInteractionCtrlHeld = false;
@@ -10959,7 +11160,7 @@ function installPlayerModifierInteraction() {
     updateOverlayCtrlTarget(gesture.lastX,gesture.lastY);
   };
   container.addEventListener('pointerdown',event=>{
-    if(event.button!==0||event.pointerType==='touch'||isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel'))return;
+    if(event.button!==0||event.pointerType==='touch'||isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
     if(!(event.ctrlKey||overlayInteractionCtrlHeld)||(event.shiftKey||playerControlsShiftHeld)||audioOnlyMode)return;
     overlayInteractionCtrlHeld=true;
     updateOverlayCtrlTarget(event.clientX,event.clientY);
@@ -10991,7 +11192,7 @@ function installPlayerModifierInteraction() {
   window.addEventListener('blur',()=>finishCtrlOverlayGesture(null,false));
   document.addEventListener('visibilitychange',()=>{if(document.hidden)finishCtrlOverlayGesture(null,false);});
   container.addEventListener('click',event=>{
-    if(isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel'))return;
+    if(isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
     if(event.ctrlKey||overlayInteractionCtrlHeld){event.preventDefault();event.stopImmediatePropagation();}
   },true);
 
@@ -10999,8 +11200,8 @@ function installPlayerModifierInteraction() {
   container.addEventListener('pointermove',event=>{
     if(event.pointerType==='touch')return;
     if(event.shiftKey&&!playerControlsShiftHeld)setPlayerControlsShiftHeld(true);
-    if(event.shiftKey||playerControlsShiftHeld)openBottomFloatForShiftHover(event.target);
-    if(bottomFloatShiftHoverOpen){
+    if(event.shiftKey||playerControlsShiftHeld)openShiftHoverControlPanel(event.target);
+    if(shiftHoverControlPanelOpen){
       overlayInteractionToolbarKey='';overlayInteractionPointer=null;modifierPointerPending=null;
       if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
       modifierPointerFrame=0;updateOverlayCtrlTarget();return;
@@ -11022,7 +11223,7 @@ function installPlayerModifierInteraction() {
     });
   },{passive:true});
   container.addEventListener('pointerleave',()=>{
-    if(bottomFloatShiftHoverOpen)closeBottomFloatForShiftHover(false);
+    if(shiftHoverControlPanelOpen)closeShiftHoverControlPanel(false);
     if(ctrlOverlayGesture)return;
     overlayInteractionPointer=null;overlayInteractionToolbarKey='';modifierPointerPending=null;
     if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
@@ -11045,7 +11246,7 @@ function installPlayerModifierInteraction() {
   container.addEventListener('wheel',event=>{
     if(!event.deltaY||audioOnlyMode)return;
     const eventElement=event.target instanceof Element?event.target:null;
-    if(eventElement?.closest('#bottomFloatPanel'))return;
+    if(eventElement?.closest('#bottomFloatPanel,#shiftHoverPanel'))return;
     const inlineControl=eventElement?.closest('.overlay-inline-controls');
     if(event.ctrlKey&&event.shiftKey){
       const key=inlineControl?.dataset.overlayOptionKey||findOverlayTextTargetAt(event.clientX,event.clientY)?.key;
@@ -11252,7 +11453,7 @@ function installVideoTouchGestures() {
 
     const touch = event.changedTouches[0] || event.touches[0];
     const target = event.target instanceof Element ? event.target : null;
-    if (target && target.closest('#playlistPermissionGate, button, input, select, textarea, a, [contenteditable="true"]')) return;
+    if (target && target.closest('#playlistPermissionGate, #shiftHoverPanel, button, input, select, textarea, a, [contenteditable="true"]')) return;
 
     const rect = videoElement.getBoundingClientRect();
     if (rect.width < 8 || rect.height < 100) return;
@@ -11332,6 +11533,7 @@ function installVideoTouchGestures() {
 
   container.addEventListener('touchcancel', cancelGesture, { passive: true });
 }
+installShiftHoverPanelInteractions();
 installPlayerModifierInteraction();
 installVideoTouchGestures();
 installBottomFloatHoverControls();
@@ -11480,11 +11682,12 @@ function applyTabletLayout2() {
 
 // 볼륨 변경 시 하단 패널 업데이트
 video.addEventListener('volumechange', () => {
-  if (bottomFloatOpen || bottomFloatHoverOpen || bottomFloatShiftHoverOpen) {
+  if (bottomFloatOpen || bottomFloatHoverOpen || shiftHoverControlPanelOpen) {
     const bv = document.getElementById('bf-vol');
     // 표시값은 메인 볼륨 기준 — TTS 덕킹으로 video.volume 이 일시적으로 낮아져도 흔들리지 않음
     if (bv) bv.textContent = Math.round(mainVolume * 100) + '%';
   }
+  updateShiftHoverPanelUI();
 });
 
 // ===================================================================
