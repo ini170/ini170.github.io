@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C359';
+document.documentElement.dataset.vpBuild = 'C360';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -818,60 +818,133 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #leftPanel.shift-controls-detached #resizeDictControl { display:none !important; }
 #videoContainer:fullscreen > #bottomFloatPanel,#videoContainer:-webkit-full-screen > #bottomFloatPanel { position:absolute; left:50%; bottom:0; transform:translateX(-50%); z-index:1005; }
 #videoContainer:fullscreen #bottomFloatContent,#videoContainer:-webkit-full-screen #bottomFloatContent { max-height:min(70vh,calc(100vh - 42px)); }
-/* Shift hover opens one neutral, movable full-settings surface inside the video. */
+/* C360 Shift hover: fit every player setting inside the video frame without scrolling. */
 #bottomFloatPanel.shift-floating-active { visibility:hidden !important; pointer-events:none !important; }
 #shiftHoverPanel {
-  position:absolute; z-index:1200; top:12px; right:12px;
+  position:absolute; z-index:1200; inset:8px;
   display:flex; flex-direction:column; box-sizing:border-box;
-  width:min(620px,calc(100% - 24px)); height:min(720px,calc(100% - 24px));
-  max-width:calc(100% - 24px); max-height:calc(100% - 24px);
-  min-width:min(280px,calc(100% - 24px)); min-height:min(180px,calc(100% - 24px));
-  overflow:hidden; resize:both; container-type:inline-size;
+  min-width:0; min-height:0; overflow:hidden; resize:none;
   color:#ddd; background:rgba(24,24,25,.98); border:1px solid #55565a; border-radius:7px;
   box-shadow:0 8px 24px rgba(0,0,0,.48);
 }
 #shiftHoverPanel[hidden] { display:none !important; }
 #shiftHoverPanelHeader {
-  display:flex; align-items:center; justify-content:space-between; gap:10px; flex:0 0 auto;
-  min-height:38px; padding:5px 8px 5px 12px; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:space-between; gap:7px; flex:0 0 30px;
+  min-height:30px; padding:2px 5px 2px 8px; box-sizing:border-box;
   color:#dedee0; background:#29292b; border-bottom:1px solid #48484b;
-  cursor:move; user-select:none; touch-action:none;
+  user-select:none;
 }
-#shiftHoverPanelTitle { font-size:12px; font-weight:700; letter-spacing:.02em; }
-#shiftHoverPanelHint { margin-left:auto; color:#929296; font-size:10px; }
+#shiftHoverPanelTitle { font-size:11px; font-weight:700; letter-spacing:.02em; }
+#shiftHoverPanelHint { margin-left:auto; color:#929296; font-size:9px; }
 #shiftHoverPanelClose {
-  flex:0 0 28px; width:28px; height:28px; padding:0; border:1px solid #55565a; border-radius:4px;
-  color:#c5c5c8; background:#353538; cursor:pointer; font-size:17px; line-height:1;
+  flex:0 0 23px; width:23px; height:23px; padding:0; border:1px solid #55565a; border-radius:4px;
+  color:#c5c5c8; background:#353538; cursor:pointer; font-size:16px; line-height:1;
 }
 #shiftHoverPanelClose:hover { color:#fff; background:#454548; }
-#shiftHoverPanelBody { flex:1 1 0; min-height:0; overflow:auto; padding:8px; box-sizing:border-box; overscroll-behavior:contain; touch-action:pan-y; }
-#shiftHoverPanel #controlsSection {
-  display:block; flex:0 0 auto !important; width:100%; min-height:0 !important; height:auto !important;
-  max-height:none !important; overflow:visible !important; box-sizing:border-box;
-  padding:2px !important; border:0 !important; border-radius:4px !important; background:transparent !important;
+#shiftHoverPanelBody { position:relative; flex:1 1 0; min-width:0; min-height:0; overflow:hidden; padding:0; box-sizing:border-box; touch-action:none; }
+#shiftHoverPanelCanvas {
+  position:absolute; top:0; left:0; display:grid;
+  grid-template-columns:minmax(0,2.15fr) minmax(190px,.85fr);
+  grid-template-rows:minmax(0,1fr) auto; gap:5px; box-sizing:border-box; overflow:hidden;
+  transform:scale(var(--shift-panel-scale,1)); transform-origin:top left;
 }
+#shiftHoverCoreHost { grid-area:1 / 1 / 2 / 2; min-width:0; min-height:0; overflow:hidden; }
+#shiftHoverToolsColumn { grid-area:1 / 2 / 2 / 3; display:grid; grid-template-rows:auto auto; align-content:start; gap:4px; min-width:0; min-height:0; overflow:hidden; }
+#shiftHoverPanel #controlsSection {
+  display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:min-content;
+  align-content:start; gap:3px; flex:none !important; width:100%; height:100% !important; min-width:0; min-height:0 !important;
+  max-height:none !important; overflow:hidden !important; box-sizing:border-box;
+  padding:3px !important; border:0 !important; border-radius:4px !important; background:transparent !important;
+}
+#shiftHoverPanel #controlsSection > div { min-width:0; margin:0 !important; box-sizing:border-box; }
 #shiftHoverPanel #controlsSection > div:first-child { display:none !important; }
-#shiftHoverPanel #controlsSection > div:nth-child(2) { border-left-color:#777 !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(2) { grid-area:1 / 1 / 2 / 4; padding:2px 5px !important; min-height:0 !important; font-size:10px !important; line-height:1.15; border-left-color:#777 !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(3) { grid-area:2 / 1 / 3 / 4; gap:2px !important; flex-wrap:nowrap !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(3) button { flex:1 1 0; min-width:0; padding:2px 1px !important; font-size:10px !important; line-height:1.05; }
+#shiftHoverPanel #controlsSection > div:nth-child(3) button span:last-child { font-size:8px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(4) { grid-area:3 / 1 / 4 / 2; gap:3px !important; font-size:9px !important; white-space:nowrap; }
+#shiftHoverPanel #controlsSection > div:nth-child(5) { grid-area:3 / 2 / 4 / 3; gap:4px !important; font-size:9px !important; flex-wrap:nowrap !important; white-space:nowrap; }
+#shiftHoverPanel #controlsSection > div:nth-child(6) { grid-area:3 / 3 / 4 / 4; padding:3px 4px !important; font-size:9px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(6) > div { margin-top:2px !important; gap:4px !important; white-space:nowrap; }
+#shiftHoverPanel #controlsSection > div:nth-child(7) { grid-area:4 / 1 / 5 / 4; padding:3px 5px !important; font-size:9px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(7) > div { margin-bottom:1px !important; gap:3px !important; line-height:1.1; }
+#shiftHoverPanel #controlsSection > div:nth-child(7) > div:last-child { display:none !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(7) button { min-height:16px; padding-top:1px !important; padding-bottom:1px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(8) { grid-area:5 / 1 / 6 / 4; padding:3px 5px !important; font-size:9px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(8) > div:first-child { flex-wrap:nowrap !important; gap:4px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(8) > div:first-child > strong { white-space:nowrap; }
+#shiftHoverPanel #controlsSection > div:nth-child(8) select,
+#shiftHoverPanel #controlsSection > div:nth-child(8) button { min-width:0; padding:2px 4px !important; font-size:9px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(8) #phraseRecordStatus { display:none !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(9) { grid-area:6 / 1 / 7 / 3; gap:4px !important; font-size:9px !important; white-space:nowrap; }
+#shiftHoverPanel #controlsSection > div:nth-child(10) { grid-area:7 / 1 / 8 / 2; }
+#shiftHoverPanel #controlsSection > div:nth-child(11) { grid-area:7 / 2 / 8 / 3; }
+#shiftHoverPanel #controlsSection > div:nth-child(12) { grid-area:7 / 3 / 8 / 4; }
+#shiftHoverPanel #controlsSection > div:nth-child(10),
+#shiftHoverPanel #controlsSection > div:nth-child(11),
+#shiftHoverPanel #controlsSection > div:nth-child(12) { gap:3px !important; font-size:9px !important; white-space:nowrap; }
+#shiftHoverPanel #controlsSection > div:nth-child(10) label,
+#shiftHoverPanel #controlsSection > div:nth-child(11) label,
+#shiftHoverPanel #controlsSection > div:nth-child(12) label { min-width:42px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(10) input,
+#shiftHoverPanel #controlsSection > div:nth-child(11) input,
+#shiftHoverPanel #controlsSection > div:nth-child(12) input { min-width:0; }
+#shiftHoverPanel #controlsSection > div:nth-child(10) span,
+#shiftHoverPanel #controlsSection > div:nth-child(11) span,
+#shiftHoverPanel #controlsSection > div:nth-child(12) span { min-width:29px !important; }
+#shiftHoverPanel #controlsSection > div:nth-child(13) { grid-area:6 / 3 / 7 / 4; align-self:center; font-size:9px !important; white-space:nowrap; }
 #shiftHoverPanel #controlsSection button.active { color:#fff !important; background:#49494d !important; border-color:#77787d !important; }
 #shiftHoverPanel #controlsSection [style*="#4fc3f7"] { color:#bdbdc0 !important; }
 #shiftHoverPanel input[type="range"] { accent-color:#a5a5a9 !important; }
-#shiftHoverPanel .bfp-section { margin:8px 0 0; padding:8px; border:1px solid #444447; border-radius:5px; background:#202022; }
-#shiftHoverPanel .bfp-section-title { color:#b6b6b9; font-size:10px; letter-spacing:.04em; }
-#shiftHoverPanel .bfp-btn { color:#d2d2d5; background:#303033; border-color:#55565a; }
+#shiftHoverPanel .bfp-section { min-width:0; margin:0; padding:5px; border:1px solid #444447; border-radius:5px; background:#202022; overflow:hidden; }
+#shiftHoverPanel .bfp-section-title { margin-bottom:3px; color:#b6b6b9; font-size:9px; letter-spacing:.03em; line-height:1.1; }
+#shiftHoverPanel .bfp-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; margin:0 0 3px; }
+#shiftHoverPanel .bfp-row:last-child { margin-bottom:0; }
+#shiftHoverPanel .bfp-btn { min-width:0; min-height:21px; padding:2px 3px; color:#d2d2d5; background:#303033; border-color:#55565a; border-radius:4px; font-size:9px; line-height:1.05; white-space:normal; }
 #shiftHoverPanel .bfp-btn:hover { color:#fff; background:#3c3c40; }
 #shiftHoverPanel .bfp-btn.active { color:#fff; background:#49494d; border-color:#77787d; }
 #shiftHoverPanel .bfp-preset { color:#d2d2d5; background:#303033; border-color:#55565a; }
 #shiftHoverPanel .bfp-preset:hover { background:#3c3c40; }
-#shiftHoverPanel .overlay-scale-controls { margin-top:4px; }
-#shiftHoverPanel .overlay-scale-value { color:#ddd; background:#29292b; border-color:#55565a; }
-#shiftHoverPanel .overlay-scale-slider:focus-visible { outline-color:#aaa; }
-#shiftHoverPanel .overlay-position-row output { color:#ccc; }
-@container (max-width:480px) {
-  #shiftHoverPanel .overlay-scale-controls { grid-template-columns:minmax(0,1fr); }
-  #shiftHoverPanel #controlsSection > div:nth-child(3) { flex-wrap:wrap !important; }
-  #shiftHoverPanel #controlsSection > div:nth-child(7) > div,
-  #shiftHoverPanel #controlsSection > div:nth-child(8) > div { flex-wrap:wrap !important; }
+#shiftHoverLayoutHost .bfp-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#shiftHoverUtilitySection .bfp-row:last-of-type { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#shiftHoverOverlaySection { grid-area:2 / 1 / 3 / 3; display:flex; flex-direction:column; gap:2px; min-width:0; min-height:0; margin:0 !important; padding:4px !important; }
+#shiftHoverOverlayHost { flex:1 1 auto; min-width:0; min-height:0; overflow:hidden; }
+#shiftHoverPanel .overlay-scale-controls { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; height:100%; min-height:0; margin:0; }
+#shiftHoverPanel .overlay-scale-card {
+  display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:20px 14px 14px 17px minmax(0,1fr) 17px;
+  gap:1px; min-width:0; min-height:0; padding:3px; overflow:hidden;
+  border:1px solid #3d3d40; border-radius:4px; background:#19191b; box-sizing:border-box;
 }
+#shiftHoverPanel .overlay-scale-card > .bfp-btn { grid-row:1; width:100% !important; min-height:0; padding:1px 3px; }
+#shiftHoverPanel .overlay-scale-meta { grid-row:2; min-width:0; gap:3px; font-size:8px; line-height:1; }
+#shiftHoverPanel .overlay-scale-value { min-width:32px; padding:1px 3px; color:#ddd; background:#29292b; border-color:#55565a; font-size:9px; }
+#shiftHoverPanel .overlay-scale-slider { grid-row:3; width:100%; min-width:0; height:14px !important; min-height:14px; margin:0; }
+#shiftHoverPanel .overlay-scale-range { display:none !important; }
+#shiftHoverPanel .overlay-scale-align { grid-row:4; gap:2px; font-size:8px; line-height:1; }
+#shiftHoverPanel .overlay-scale-align > span { flex:0 0 22px; }
+#shiftHoverPanel .overlay-scale-align .bfp-btn { min-height:15px; padding:0 3px; font-size:8px; }
+#shiftHoverPanel .overlay-position-controls { grid-row:5; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:1px 4px; min-height:0; }
+#shiftHoverPanel .overlay-position-row { grid-template-columns:18px minmax(0,1fr) 28px; gap:2px; min-width:0; font-size:8px; line-height:1; }
+#shiftHoverPanel .overlay-position-row input { width:100%; min-width:0; height:14px !important; min-height:14px; margin:0; }
+#shiftHoverPanel .overlay-position-row output { color:#ccc; font-size:8px; }
+#shiftHoverPanel .overlay-position-reset { grid-row:6; width:100%; min-height:0; padding:1px 3px; font-size:8px; }
+@media (pointer: coarse) {
+  #shiftHoverPanel .overlay-position-row input { height:14px !important; min-height:14px; }
+  #shiftHoverPanel #controlsSection input[type="range"] { min-height:14px; }
+}
+#shiftHoverPanel[data-density="tight"] #shiftHoverPanelTitle { font-size:10px; }
+#shiftHoverPanel[data-density="tight"] #shiftHoverPanelHint { font-size:8px; }
+#shiftHoverPanel[data-density="tight"] #shiftHoverPanelCanvas { gap:3px; }
+#shiftHoverPanel[data-density="tight"] .bfp-section { padding:3px; }
+#shiftHoverPanel[data-density="tight"] .bfp-section-title { font-size:8px; }
+#shiftHoverPanel[data-density="tight"] .bfp-btn { min-height:18px; font-size:8px; }
+#shiftHoverPanel[data-density="tight"] #controlsSection { gap:2px; padding:2px !important; }
+#shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(3) button { font-size:9px !important; }
+#shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(7) { padding:2px 3px !important; }
+#shiftHoverPanel[data-density="tight"] #controlsSection > div:nth-child(8) { padding:2px 3px !important; }
+#shiftHoverPanel[data-density="tight"] .overlay-scale-card { padding:2px; grid-template-rows:18px 12px 12px 15px minmax(0,1fr) 15px; }
+#shiftHoverPanel[data-density="tight"] .overlay-scale-card > .bfp-btn { font-size:8px; }
+#shiftHoverPanel[data-density="tight"] .overlay-position-row { grid-template-columns:16px minmax(0,1fr) 25px; }
 /* ===== 오디오 전용 모드 바 ===== */
 
 #audioModeBar {
@@ -1052,39 +1125,43 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       <section id="shiftHoverPanel" role="dialog" aria-label="플레이어 전체 설정" aria-hidden="true" hidden>
         <header id="shiftHoverPanelHeader">
           <span id="shiftHoverPanelTitle">플레이어 전체 설정</span>
-          <span id="shiftHoverPanelHint">Shift 호버 · 드래그 이동 · 모서리 크기 조절</span>
+          <span id="shiftHoverPanelHint">Shift 호버 · 한 화면 전체 조작</span>
           <button id="shiftHoverPanelClose" type="button" aria-label="설정 창 닫기" title="닫기 · Shift 해제 전까지 숨김" onclick="closeShiftHoverControlPanel(true)">×</button>
         </header>
         <div id="shiftHoverPanelBody">
-          <div id="shiftHoverCoreHost"></div>
-          <div class="bfp-section" id="shiftHoverUtilitySection">
-            <div class="bfp-section-title">재생·화면 빠른 조작</div>
-            <div class="bfp-row">
-              <button class="bfp-btn" type="button" onclick="video.currentTime=Math.max(0,video.currentTime-5)">↩ −5초</button>
-              <button class="bfp-btn" id="shift-hover-skip" type="button" onclick="shiftHoverToggleSkipGaps()">⏭ 공백 건너뛰기</button>
-              <button class="bfp-btn" type="button" onclick="video.currentTime=Math.min(video.duration||video.currentTime,video.currentTime+5)">+5초 ↪</button>
+          <div id="shiftHoverPanelCanvas">
+            <div id="shiftHoverCoreHost"></div>
+            <div id="shiftHoverToolsColumn">
+              <div class="bfp-section" id="shiftHoverUtilitySection">
+                <div class="bfp-section-title">재생·화면 빠른 조작</div>
+                <div class="bfp-row">
+                  <button class="bfp-btn" type="button" onclick="video.currentTime=Math.max(0,video.currentTime-5)">↩ −5초</button>
+                  <button class="bfp-btn" id="shift-hover-skip" type="button" onclick="shiftHoverToggleSkipGaps()">⏭ 공백 건너뛰기</button>
+                  <button class="bfp-btn" type="button" onclick="video.currentTime=Math.min(video.duration||video.currentTime,video.currentTime+5)">+5초 ↪</button>
+                </div>
+                <div class="bfp-row">
+                  <button class="bfp-btn" type="button" onclick="stepFrame(-1)">◀ 이전 프레임</button>
+                  <button class="bfp-btn" id="shift-hover-fps" type="button" disabled>30fps</button>
+                  <button class="bfp-btn" type="button" onclick="stepFrame(1)">다음 프레임 ▶</button>
+                </div>
+                <div class="bfp-row">
+                  <button class="bfp-btn" type="button" onclick="adjustMainVolume(-0.1);updateShiftHoverPanelUI()">🔉 음량 −10%</button>
+                  <button class="bfp-btn" id="shift-hover-volume" type="button" disabled>30%</button>
+                  <button class="bfp-btn" type="button" onclick="adjustMainVolume(0.1);updateShiftHoverPanelUI()">🔊 음량 +10%</button>
+                </div>
+                <div class="bfp-row">
+                  <button class="bfp-btn" id="shift-hover-trans" type="button" onclick="toggleTransPanel();updateShiftHoverPanelUI()">🌐 번역 패널</button>
+                  <button class="bfp-btn" id="shift-hover-dict" type="button" onclick="toggleCharDictPanel();updateShiftHoverPanelUI()">📖 한자 패널</button>
+                  <button class="bfp-btn" id="shift-hover-side" type="button" onclick="toggleSidePanel();updateShiftHoverPanelUI()">📋 사이드 패널</button>
+                  <button class="bfp-btn" id="shift-hover-audio" type="button" onclick="shiftHoverToggleAudioOnly()">🔊 오디오 전용</button>
+                </div>
+              </div>
+              <div id="shiftHoverLayoutHost"></div>
             </div>
-            <div class="bfp-row">
-              <button class="bfp-btn" type="button" onclick="stepFrame(-1)">◀ 이전 프레임</button>
-              <button class="bfp-btn" id="shift-hover-fps" type="button" disabled>30fps</button>
-              <button class="bfp-btn" type="button" onclick="stepFrame(1)">다음 프레임 ▶</button>
+            <div class="bfp-section" id="shiftHoverOverlaySection">
+              <div class="bfp-section-title">영상 위 자막·번역·한자 표시 조정</div>
+              <div id="shiftHoverOverlayHost"></div>
             </div>
-            <div class="bfp-row">
-              <button class="bfp-btn" type="button" onclick="adjustMainVolume(-0.1);updateShiftHoverPanelUI()">🔉 음량 −10%</button>
-              <button class="bfp-btn" id="shift-hover-volume" type="button" disabled>30%</button>
-              <button class="bfp-btn" type="button" onclick="adjustMainVolume(0.1);updateShiftHoverPanelUI()">🔊 음량 +10%</button>
-            </div>
-            <div class="bfp-row">
-              <button class="bfp-btn" id="shift-hover-trans" type="button" onclick="toggleTransPanel();updateShiftHoverPanelUI()">🌐 번역 패널</button>
-              <button class="bfp-btn" id="shift-hover-dict" type="button" onclick="toggleCharDictPanel();updateShiftHoverPanelUI()">📖 한자 패널</button>
-              <button class="bfp-btn" id="shift-hover-side" type="button" onclick="toggleSidePanel();updateShiftHoverPanelUI()">📋 사이드 패널</button>
-              <button class="bfp-btn" id="shift-hover-audio" type="button" onclick="shiftHoverToggleAudioOnly()">🔊 오디오 전용</button>
-            </div>
-          </div>
-          <div id="shiftHoverLayoutHost"></div>
-          <div class="bfp-section" id="shiftHoverOverlaySection">
-            <div class="bfp-section-title">영상 위 자막·번역·한자 표시 조정</div>
-            <div id="shiftHoverOverlayHost"></div>
           </div>
         </div>
       </section>
@@ -10650,6 +10727,7 @@ function syncShiftHoverControlPanel() {
   moveShiftHoverNode('controlsSection', 'shiftHoverCoreHost');
   moveShiftHoverNode('bottomFloatLayoutSection', 'shiftHoverLayoutHost');
   moveShiftHoverNode('bottomFloatOverlayControls', 'shiftHoverOverlayHost');
+  syncShiftHoverPanelFit();
   updateShiftHoverPanelUI();
 }
 function openShiftHoverControlPanel(eventTarget) {
@@ -10715,63 +10793,44 @@ function shiftHoverToggleAudioOnly() {
   toggleAudioOnly();
   updateShiftHoverPanelUI();
 }
+function syncShiftHoverPanelFit() {
+  const panel = document.getElementById('shiftHoverPanel');
+  const body = document.getElementById('shiftHoverPanelBody');
+  const canvas = document.getElementById('shiftHoverPanelCanvas');
+  if (!panel || panel.hidden || !body || !canvas) return;
+  const width = body.clientWidth;
+  const height = body.clientHeight;
+  if (width < 1 || height < 1) return;
+  const scale = Math.min(1, width / 760, height / 500);
+  if (!Number.isFinite(scale) || scale <= 0) return;
+  canvas.style.width = (width / scale) + 'px';
+  canvas.style.height = (height / scale) + 'px';
+  canvas.style.setProperty('--shift-panel-scale', String(scale));
+  panel.dataset.density = scale < 0.72 ? 'tight' : 'normal';
+}
 function installShiftHoverPanelInteractions() {
   const panel = document.getElementById('shiftHoverPanel');
-  const header = document.getElementById('shiftHoverPanelHeader');
   const container = document.getElementById('videoContainer');
-  if (!panel || !header || !container || panel.dataset.interactionReady === '1') return;
+  const body = document.getElementById('shiftHoverPanelBody');
+  if (!panel || !container || !body || panel.dataset.interactionReady === '1') return;
   panel.dataset.interactionReady = '1';
-  let drag = null;
-  const clampDraggedPanel = () => {
-    if (panel.hidden || panel.style.left === '') return;
-    const maxLeft = Math.max(0,container.clientWidth-panel.offsetWidth);
-    const maxTop = Math.max(0,container.clientHeight-panel.offsetHeight);
-    const left = Number.parseFloat(panel.style.left) || 0;
-    const top = Number.parseFloat(panel.style.top) || 0;
-    panel.style.left = Math.max(0,Math.min(maxLeft,left)) + 'px';
-    panel.style.top = Math.max(0,Math.min(maxTop,top)) + 'px';
-  };
+  const fit = () => syncShiftHoverPanelFit();
   if (typeof ResizeObserver === 'function') {
-    const shiftPanelResizeObserver = new ResizeObserver(clampDraggedPanel);
+    const shiftPanelResizeObserver = new ResizeObserver(fit);
     shiftPanelResizeObserver.observe(container);
     shiftPanelResizeObserver.observe(panel);
+    shiftPanelResizeObserver.observe(body);
     panel._shiftPanelResizeObserver = shiftPanelResizeObserver;
+  } else {
+    window.addEventListener('resize', fit, {passive:true});
   }
-  const finishDrag = event => {
-    if (!drag || (event && event.pointerId !== drag.pointerId)) return;
-    const pointerId = drag.pointerId;
-    drag = null;
-    try { if (header.hasPointerCapture(pointerId)) header.releasePointerCapture(pointerId); } catch (_) {}
-  };
-  header.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || event.target instanceof Element && event.target.closest('button,input,select,textarea,a')) return;
-    const frame = container.getBoundingClientRect();
-    const rect = panel.getBoundingClientRect();
-    drag = { pointerId:event.pointerId, offsetX:event.clientX-rect.left, offsetY:event.clientY-rect.top };
-    panel.style.left = Math.max(0,rect.left-frame.left) + 'px';
-    panel.style.top = Math.max(0,rect.top-frame.top) + 'px';
-    panel.style.right = 'auto';
-    try { header.setPointerCapture(event.pointerId); } catch (_) {}
-    event.preventDefault();
-    event.stopPropagation();
-  });
-  header.addEventListener('pointermove', event => {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const frame = container.getBoundingClientRect();
-    const maxLeft = Math.max(0,container.clientWidth-panel.offsetWidth);
-    const maxTop = Math.max(0,container.clientHeight-panel.offsetHeight);
-    panel.style.left = Math.max(0,Math.min(maxLeft,event.clientX-frame.left-drag.offsetX)) + 'px';
-    panel.style.top = Math.max(0,Math.min(maxTop,event.clientY-frame.top-drag.offsetY)) + 'px';
-    event.preventDefault();
-    event.stopPropagation();
-  });
-  header.addEventListener('pointerup', finishDrag);
-  header.addEventListener('pointercancel', finishDrag);
-  header.addEventListener('lostpointercapture', finishDrag);
   panel.addEventListener('pointerdown', event => event.stopPropagation());
   panel.addEventListener('click', event => event.stopPropagation());
-  panel.addEventListener('wheel', event => event.stopPropagation(), {passive:true});
-  window.addEventListener('blur', () => finishDrag(null));
+  panel.addEventListener('wheel', event => {
+    event.stopPropagation();
+    if (!(event.target instanceof Element) || !event.target.closest('input,select,button')) event.preventDefault();
+  }, {passive:false});
+  fit();
 }
 document.addEventListener('fullscreenchange', syncBottomFloatPanelPlacement);
 document.addEventListener('webkitfullscreenchange', syncBottomFloatPanelPlacement);
