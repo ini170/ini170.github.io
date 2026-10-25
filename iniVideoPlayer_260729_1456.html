@@ -810,7 +810,10 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .overlay-inline-controls .overlay-inline-toggle { min-width:42px; }
 .overlay-inline-controls .overlay-inline-align { display:inline-flex; align-items:center; flex-wrap:wrap; gap:2px; min-width:0; border-left:1px solid rgba(145,145,152,.38); padding-left:4px; }
 @media (max-width:480px) { .overlay-inline-controls { gap:3px; padding:3px; } .overlay-inline-controls button { min-width:24px; min-height:24px; padding:2px 3px; } }
-#videoContainerFullscreenButton { position:absolute; z-index:1002; top:8px; right:8px; display:none; min-width:42px; min-height:38px; align-items:center; justify-content:center; border:1px solid rgba(190,210,225,.55); border-radius:6px; background:rgba(5,10,16,.78); color:#e8f6ff; font:700 13px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+#videoContainerFullscreenButton { position:absolute; z-index:1002; top:auto; right:88px; bottom:54px; display:none; width:36px; min-width:36px; height:36px; min-height:36px; padding:0; align-items:center; justify-content:center; border:1px solid rgba(190,190,198,.32); border-radius:4px; background:rgba(18,18,20,.42); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+#videoContainerFullscreenButton:hover,#videoContainerFullscreenButton:focus-visible { border-color:rgba(220,220,225,.55); background:rgba(68,68,74,.72); }
+#video::-webkit-media-controls-fullscreen-button { display:none !important; }
+@media (max-width:480px) { #videoContainerFullscreenButton { right:56px; bottom:48px; width:34px; min-width:34px; height:34px; min-height:34px; } }
 #videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { display:flex; }
 #videoContainer:fullscreen,#videoContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; max-width:100vw !important; max-height:100vh !important; flex:none !important; border:0 !important; border-radius:0 !important; background:#000 !important; }
 #videoContainer:fullscreen > video,#videoContainer:-webkit-full-screen > video { width:100% !important; height:100% !important; object-fit:contain; }
@@ -1740,7 +1743,7 @@ function syncContainerFullscreenButton() {
   const container = document.getElementById('videoContainer');
   if (!button || !container) return;
   const active = document.fullscreenElement === container || document.webkitFullscreenElement === container;
-  button.textContent = active ? '⛶ 종료' : '⛶';
+  button.textContent = '⛶';
   button.setAttribute('aria-label', active ? '플레이어 전체화면 종료' : '플레이어 전체화면');
   button.title = active ? '플레이어 전체화면 종료' : '플레이어 전체화면';
 }
