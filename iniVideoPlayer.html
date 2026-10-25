@@ -1582,12 +1582,12 @@ const SC_DEFAULTS = {
   'seek-forward':   { code:'ArrowRight',   shift:false,ctrl:false, label:'+1초',             group:'▶ 재생' },
   'mute':           { code:'KeyM',         shift:false,ctrl:false, label:'음소거',            group:'▶ 재생' },
   'audio-only':     { code:'KeyV',         shift:false,ctrl:false, label:'오디오 전용 모드', group:'▶ 재생' },
-  'vol-down':       { code:'Comma',        shift:false,ctrl:false, label:'볼륨 −',           group:'▶ 재생' },
-  'vol-up':         { code:'Period',       shift:false,ctrl:false, label:'볼륨 +',           group:'▶ 재생' },
+  'vol-down':       { code:'ArrowDown',    shift:false,ctrl:false, label:'볼륨 −',           group:'▶ 재생' },
+  'vol-up':         { code:'ArrowUp',      shift:false,ctrl:false, label:'볼륨 +',           group:'▶ 재생' },
   'open-file':      { code:'KeyO',         shift:false,ctrl:false, label:'파일 열기',         group:'▶ 재생' },
   // 자막 이동
-  'prev-sub':       { code:'Home',         shift:false,ctrl:false, label:'이전 자막',         group:'📑 자막' },
-  'next-sub':       { code:'End',          shift:false,ctrl:false, label:'다음 자막',         group:'📑 자막' },
+  'prev-sub':       { code:'Comma',        shift:false,ctrl:false, aliases:['Home'], label:'이전 자막',         group:'📑 자막' },
+  'next-sub':       { code:'Period',       shift:false,ctrl:false, aliases:['End'], label:'다음 자막',         group:'📑 자막' },
   'prev-sub-shift': { code:'ArrowLeft',    shift:true, ctrl:false, label:'이전 자막(부)',     group:'📑 자막' },
   'next-sub-shift': { code:'ArrowRight',   shift:true, ctrl:false, label:'다음 자막(부)',     group:'📑 자막' },
   'timeline-focus': { code:'Quote',        shift:false,ctrl:false, label:'타임라인 포커스',   group:'📑 자막' },
@@ -1610,8 +1610,8 @@ const SC_DEFAULTS = {
   'tts-toggle':     { code:'KeyT',         shift:false,ctrl:false, label:'TTS ON/OFF',        group:'🔊 TTS' },
   'tts-mode':       { code:'KeyB',         shift:false,ctrl:false, label:'TTS 모드 전환',     group:'🔊 TTS' },
   // 플레이리스트
-  'pl-up':          { code:'ArrowUp',      shift:false,ctrl:false, label:'항목 위로',         group:'📋 목록' },
-  'pl-down':        { code:'ArrowDown',    shift:false,ctrl:false, label:'항목 아래로',       group:'📋 목록' },
+  'pl-up':          { code:'ArrowUp',      shift:false,ctrl:false, label:'항목 위로 (목록 포커스)', group:'📋 목록' },
+  'pl-down':        { code:'ArrowDown',    shift:false,ctrl:false, label:'항목 아래로 (목록 포커스)', group:'📋 목록' },
   'pl-play':        { code:'Enter',        shift:false,ctrl:false, label:'선택 재생',         group:'📋 목록' },
   'pl-open-location':{ code:'Enter',       shift:false,ctrl:true,  label:'연결 위치 열기',     group:'📋 목록' },
   'pl-copy-parent': { code:'KeyC',         shift:false,ctrl:true, alt:false,label:'상위 경로 복사', group:'📋 목록' },
@@ -1652,6 +1652,33 @@ function _codeLabel(code, shift, ctrl, alt) {
 
 let customSC = {};
 try { customSC = JSON.parse(localStorage.getItem('iniVP_SC') || '{}'); } catch(_) {}
+if (!customSC || typeof customSC !== 'object' || Array.isArray(customSC)) customSC = {};
+
+// 이전 기본 단축키가 사용자가 저장한 값으로 남아 있으면 새 기본값으로 한 번만 이동한다.
+// 그 외 사용자가 직접 지정한 키는 유지한다.
+(function migrateLegacyShortcutDefaults(){
+  const versionKey = 'iniVP_SC_DEFAULTS_MIGRATION';
+  try {
+    if (Number(localStorage.getItem(versionKey) || 0) >= 1) return;
+    const migrations = [
+      { id:'vol-down', oldCode:'Comma', newCode:'ArrowDown' },
+      { id:'vol-up', oldCode:'Period', newCode:'ArrowUp' },
+      { id:'prev-sub', oldCode:'Home', remove:true },
+      { id:'next-sub', oldCode:'End', remove:true }
+    ];
+    let changed = false;
+    for (const migration of migrations) {
+      const binding = customSC[migration.id];
+      if (!binding || binding.code !== migration.oldCode ||
+          binding.shift === true || binding.ctrl === true || binding.alt === true) continue;
+      if (migration.remove) delete customSC[migration.id];
+      else customSC[migration.id] = { ...binding, code:migration.newCode };
+      changed = true;
+    }
+    if (changed) localStorage.setItem('iniVP_SC', JSON.stringify(customSC));
+    localStorage.setItem(versionKey, '1');
+  } catch(_) {}
+})();
 
 function getSC(id) {
   return customSC[id] ? { ...SC_DEFAULTS[id], ...customSC[id] } : SC_DEFAULTS[id];
@@ -1659,7 +1686,9 @@ function getSC(id) {
 function matchSC(id, e) {
   const sc = getSC(id);
   if (!sc) return false;
-  const codeMatches = e.code === sc.code ||
+  const defaultAliasMatches = !customSC[id] &&
+    Array.isArray(SC_DEFAULTS[id]?.aliases) && SC_DEFAULTS[id].aliases.includes(e.code);
+  const codeMatches = e.code === sc.code || defaultAliasMatches ||
     (id === 'pl-open-location' && sc.code === 'Enter' && e.code === 'NumpadEnter' && e.key === 'Enter');
   return codeMatches && e.shiftKey === sc.shift && e.ctrlKey === sc.ctrl && e.altKey === (sc.alt === true);
 }
@@ -1724,7 +1753,8 @@ function renderShortcutPanel() {
       const sc   = getSC(id);
       const isCustom = !!customSC[id];
       const isBinding = _scRebinding === id;
-      const keyLabel = _codeLabel(sc.code, sc.shift, sc.ctrl, sc.alt);
+      const keyCodes = [sc.code, ...(!isCustom && Array.isArray(SC_DEFAULTS[id].aliases) ? SC_DEFAULTS[id].aliases : [])];
+      const keyLabel = keyCodes.map(code => _codeLabel(code, sc.shift, sc.ctrl, sc.alt)).join(' / ');
       if (isBinding) {
         html += `<div class="sc-row sc-listening">
           <span class="sc-desc">${SC_DEFAULTS[id].label}</span>
@@ -9652,11 +9682,11 @@ document.addEventListener('keydown', (e) => {
     video.currentTime = Math.max(video.currentTime - 1, 0);
     showTimeDisplay(`← ${formatTimeWithDuration(video.currentTime)}`);
   }
-  else if(matchSC('pl-up', e)) {
+  else if(matchSC('pl-up', e) && document.activeElement === playlistDiv) {
     e.preventDefault();
     movePlaylistItemUp();
   }
-  else if(matchSC('pl-down', e)) {
+  else if(matchSC('pl-down', e) && document.activeElement === playlistDiv) {
     e.preventDefault();
     movePlaylistItemDown();
   }
