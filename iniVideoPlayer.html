@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C233';
+document.documentElement.dataset.vpBuild = 'C354';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -680,6 +680,15 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .overlay-scale-slider { display: block; width: 100%; min-width: 0; height: 30px; margin: 0; accent-color: #4fc3f7; cursor: pointer; touch-action: pan-y; }
 .overlay-scale-slider:focus-visible { outline: 2px solid #4fc3f7; outline-offset: 1px; }
 .overlay-scale-range { display: flex; justify-content: space-between; gap: 4px; color: #777; font-size: 9px; line-height: 1.2; white-space: nowrap; }
+.overlay-scale-align { display:flex; align-items:center; gap:3px; color:#888; font-size:10px; }
+.overlay-scale-align > span { flex:0 0 28px; }
+.overlay-scale-align .bfp-btn { min-width:0; padding:4px 5px; }
+.overlay-position-controls { display:grid; gap:2px; }
+.overlay-position-row { display:grid; grid-template-columns:24px minmax(0,1fr) 32px; align-items:center; gap:4px; color:#888; font-size:10px; }
+.overlay-position-row input { width:100%; min-width:0; height:22px; margin:0; accent-color:#4fc3f7; }
+.overlay-position-row output { color:#81d4fa; text-align:right; font-variant-numeric:tabular-nums; }
+.overlay-position-reset { width:100%; min-width:0; padding:4px 5px; }
+@media (pointer: coarse) { .overlay-position-row input { height:36px; } }
 @media (max-width: 420px) {
   .overlay-scale-controls { grid-template-columns: 1fr; gap: 8px; }
   .overlay-scale-card { padding-bottom: 5px; border-bottom: 1px solid #292938; }
@@ -804,6 +813,8 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { display:flex; }
 #videoContainer:fullscreen,#videoContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; max-width:100vw !important; max-height:100vh !important; flex:none !important; border:0 !important; border-radius:0 !important; background:#000 !important; }
 #videoContainer:fullscreen > video,#videoContainer:-webkit-full-screen > video { width:100% !important; height:100% !important; object-fit:contain; }
+#videoContainer:fullscreen > #bottomFloatPanel,#videoContainer:-webkit-full-screen > #bottomFloatPanel { position:absolute; left:50%; bottom:0; transform:translateX(-50%); z-index:1005; }
+#videoContainer:fullscreen #bottomFloatContent,#videoContainer:-webkit-full-screen #bottomFloatContent { max-height:min(70vh,calc(100vh - 42px)); }
 /* ===== 오디오 전용 모드 바 ===== */
 
 #audioModeBar {
@@ -1419,6 +1430,17 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
           </div>
           <input class="overlay-scale-slider" id="subOverlayScaleSlider" type="range" min="0.3" max="3" step="0.05" value="1" aria-label="자막 영상 위 글자 크기" oninput="setSubOverlayScaleFromSlider(this.value, false)" onchange="setSubOverlayScaleFromSlider(this.value, true)">
           <div class="overlay-scale-range"><span>작게 · 30%</span><span>크게 · 300%</span></div>
+          <div class="overlay-scale-align" role="group" aria-label="자막 영상 위 정렬">
+            <span>정렬</span>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="subtitle:left" onclick="setOverlayAlignmentForKey('subtitle','left')">좌</button>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="subtitle:center" onclick="setOverlayAlignmentForKey('subtitle','center')">중</button>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="subtitle:right" onclick="setOverlayAlignmentForKey('subtitle','right')">우</button>
+          </div>
+          <div class="overlay-position-controls" role="group" aria-label="자막 영상 위 위치">
+            <label class="overlay-position-row">가로<input id="subOverlayXSlider" type="range" min="2" max="98" step="1" aria-label="자막 가로 위치" oninput="setOverlayPositionAxis('subtitle','x',this.value,false)" onchange="setOverlayPositionAxis('subtitle','x',this.value,true)"><output id="subOverlayXValue">50%</output></label>
+            <label class="overlay-position-row">세로<input id="subOverlayYSlider" type="range" min="2" max="98" step="1" aria-label="자막 세로 위치" oninput="setOverlayPositionAxis('subtitle','y',this.value,false)" onchange="setOverlayPositionAxis('subtitle','y',this.value,true)"><output id="subOverlayYValue">84%</output></label>
+          </div>
+          <button type="button" class="bfp-btn overlay-position-reset" onclick="resetOverlayPositionForKey('subtitle')">위치 초기화</button>
         </div>
         <!-- 번역 영상위 -->
         <div class="overlay-scale-card">
@@ -1429,6 +1451,17 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
           </div>
           <input class="overlay-scale-slider" id="transOverlayScaleSlider" type="range" min="0.3" max="3" step="0.05" value="1" aria-label="번역 영상 위 글자 크기" oninput="setTransOverlayScaleFromSlider(this.value, false)" onchange="setTransOverlayScaleFromSlider(this.value, true)">
           <div class="overlay-scale-range"><span>작게 · 30%</span><span>크게 · 300%</span></div>
+          <div class="overlay-scale-align" role="group" aria-label="번역 영상 위 정렬">
+            <span>정렬</span>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="translation:left" onclick="setOverlayAlignmentForKey('translation','left')">좌</button>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="translation:center" onclick="setOverlayAlignmentForKey('translation','center')">중</button>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="translation:right" onclick="setOverlayAlignmentForKey('translation','right')">우</button>
+          </div>
+          <div class="overlay-position-controls" role="group" aria-label="번역 영상 위 위치">
+            <label class="overlay-position-row">가로<input id="transOverlayXSlider" type="range" min="2" max="98" step="1" aria-label="번역 가로 위치" oninput="setOverlayPositionAxis('translation','x',this.value,false)" onchange="setOverlayPositionAxis('translation','x',this.value,true)"><output id="transOverlayXValue">50%</output></label>
+            <label class="overlay-position-row">세로<input id="transOverlayYSlider" type="range" min="2" max="98" step="1" aria-label="번역 세로 위치" oninput="setOverlayPositionAxis('translation','y',this.value,false)" onchange="setOverlayPositionAxis('translation','y',this.value,true)"><output id="transOverlayYValue">50%</output></label>
+          </div>
+          <button type="button" class="bfp-btn overlay-position-reset" onclick="resetOverlayPositionForKey('translation')">위치 초기화</button>
         </div>
         <!-- 한자 영상위 -->
         <div class="overlay-scale-card">
@@ -1439,6 +1472,17 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
           </div>
           <input class="overlay-scale-slider" id="hanziOverlayScaleSlider" type="range" min="0.3" max="3" step="0.05" value="1" aria-label="한자 영상 위 글자 크기" oninput="setHanziOverlayScaleFromSlider(this.value, false)" onchange="setHanziOverlayScaleFromSlider(this.value, true)">
           <div class="overlay-scale-range"><span>작게 · 30%</span><span>크게 · 300%</span></div>
+          <div class="overlay-scale-align" role="group" aria-label="한자 영상 위 정렬">
+            <span>정렬</span>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="hanzi:left" onclick="setOverlayAlignmentForKey('hanzi','left')">좌</button>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="hanzi:center" onclick="setOverlayAlignmentForKey('hanzi','center')">중</button>
+            <button type="button" class="bfp-btn" data-overlay-panel-align="hanzi:right" onclick="setOverlayAlignmentForKey('hanzi','right')">우</button>
+          </div>
+          <div class="overlay-position-controls" role="group" aria-label="한자 영상 위 위치">
+            <label class="overlay-position-row">가로<input id="hanziOverlayXSlider" type="range" min="2" max="98" step="1" aria-label="한자 가로 위치" oninput="setOverlayPositionAxis('hanzi','x',this.value,false)" onchange="setOverlayPositionAxis('hanzi','x',this.value,true)"><output id="hanziOverlayXValue">50%</output></label>
+            <label class="overlay-position-row">세로<input id="hanziOverlayYSlider" type="range" min="2" max="98" step="1" aria-label="한자 세로 위치" oninput="setOverlayPositionAxis('hanzi','y',this.value,false)" onchange="setOverlayPositionAxis('hanzi','y',this.value,true)"><output id="hanziOverlayYValue">15%</output></label>
+          </div>
+          <button type="button" class="bfp-btn overlay-position-reset" onclick="resetOverlayPositionForKey('hanzi')">위치 초기화</button>
         </div>
       </div>
     </div>
@@ -10412,19 +10456,71 @@ function updateTopFloatUI() {
 // ===== 하단 플로팅 패널 =====
 let bottomFloatOpen = false;
 let bottomFloatHoverOpen = false;
+let bottomFloatOpenedByShift = false;
+let bottomFloatFullscreenPlaceholder = null;
 function syncBottomFloatPanel() {
   const panel = document.getElementById('bottomFloatPanel');
   const tab = document.getElementById('bottomFloatTab');
   if (!panel || !tab) return;
   const isOpen = bottomFloatOpen || bottomFloatHoverOpen;
   panel.classList.toggle('panel-open', isOpen);
-  tab.textContent = isOpen ? '▼ 컨트롤' : '▲ 컨트롤';
+  tab.textContent = isOpen ? (bottomFloatOpenedByShift ? '▼ 전체 컨트롤' : '▼ 컨트롤') : '▲ 컨트롤';
   if (isOpen) updateBottomFloatUI();
 }
 function toggleBottomFloat() {
-  bottomFloatOpen = !bottomFloatOpen;
+  if (bottomFloatOpen || bottomFloatHoverOpen) {
+    bottomFloatOpen = false;
+    bottomFloatHoverOpen = false;
+    bottomFloatOpenedByShift = false;
+  } else {
+    bottomFloatOpen = true;
+  }
   syncBottomFloatPanel();
 }
+function openBottomFloatForShiftHover(eventTarget) {
+  if (!playerControlsShiftHeld || audioOnlyMode || (eventTarget instanceof Element && eventTarget.closest('#bottomFloatPanel'))) return false;
+  const container = document.getElementById('videoContainer');
+  if (!container) return false;
+  const rect = container.getBoundingClientRect();
+  const pointer = overlayInteractionPointer;
+  const pointerInside = container.matches(':hover') || (pointer && pointer.x >= rect.left && pointer.x <= rect.right && pointer.y >= rect.top && pointer.y <= rect.bottom);
+  if (!pointerInside) return false;
+  if (bottomFloatOpen && bottomFloatOpenedByShift) return true;
+  bottomFloatOpen = true;
+  bottomFloatOpenedByShift = true;
+  syncBottomFloatPanel();
+  return true;
+}
+function syncBottomFloatFullscreenPlacement() {
+  const panel = document.getElementById('bottomFloatPanel');
+  const container = document.getElementById('videoContainer');
+  if (!panel || !container) return;
+  const isFullscreen = document.fullscreenElement === container || document.webkitFullscreenElement === container;
+  if (isFullscreen) {
+    if (panel.parentElement === container) return;
+    if (panel.parentNode && !bottomFloatFullscreenPlaceholder) {
+      bottomFloatFullscreenPlaceholder = document.createComment(' bottomFloatPanel home ');
+      panel.parentNode.insertBefore(bottomFloatFullscreenPlaceholder, panel);
+    }
+    container.appendChild(panel);
+    return;
+  }
+  if (bottomFloatFullscreenPlaceholder?.parentNode) {
+    bottomFloatFullscreenPlaceholder.parentNode.insertBefore(panel, bottomFloatFullscreenPlaceholder);
+    bottomFloatFullscreenPlaceholder.remove();
+    bottomFloatFullscreenPlaceholder = null;
+  }
+}
+document.addEventListener('fullscreenchange', syncBottomFloatFullscreenPlacement);
+document.addEventListener('webkitfullscreenchange', syncBottomFloatFullscreenPlacement);
+window.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !bottomFloatOpenedByShift) return;
+  if (event.target instanceof Element && event.target.matches('input,select,textarea,[contenteditable="true"]')) return;
+  bottomFloatOpen = false;
+  bottomFloatHoverOpen = false;
+  bottomFloatOpenedByShift = false;
+  syncBottomFloatPanel();
+}, true);
 function installBottomFloatHoverControls() {
   const panel = document.getElementById('bottomFloatPanel');
   if (!panel || panel.dataset.hoverControlsReady === '1') return;
@@ -10469,6 +10565,13 @@ function updateBottomFloatUI() {
   set('bf-trans-ov',   transVideoOverlayEnabled);
   set('bf-hanzi-ov', hanziVideoOverlayEnabled);
   set('bf-seq',      sequentialSlowdownEnabled);
+  document.querySelectorAll('[data-overlay-panel-align]').forEach(button => {
+    const [key, alignment] = button.dataset.overlayPanelAlign.split(':');
+    const selected = overlayAlignmentForKey(key) === alignment;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  for (const key of ['subtitle','translation','hanzi']) syncOverlayPositionControlsForKey(key);
   const txt = (id, t) => { const b = document.getElementById(id); if(b) b.textContent = t; };
   txt('bf-ttsMode',  ttsLoopMode === 'overlap' ? '🎞 오버랩' : '⏸ 일시정지');
   txt('bf-vol',      Math.round(mainVolume * 100) + '%');
@@ -10516,7 +10619,7 @@ function toggleAudioOnly() {
     resizer.style.display = '';
   }
   updateTopFloatUI(); updateBottomFloatUI();
-  updateOverlayShiftTarget();
+  updateOverlayCtrlTarget();
   try { saveSettings(); } catch(_) {}
 }
 
@@ -10530,8 +10633,8 @@ function _updateAudioModeTitle() {
   }
 }
 
-// ===== Ctrl/Shift hover: 선택 레이어의 표시·정렬 컨트롤 =====
-let overlayInteractionShiftHeld = false;
+// ===== Ctrl hover: 선택 레이어의 직접 표시·정렬 컨트롤 =====
+let playerControlsShiftHeld = false;
 let overlayInteractionCtrlHeld = false;
 let overlayInteractionPointer = null;
 let overlayInteractionToolbarKey = '';
@@ -10617,6 +10720,13 @@ function setOverlayAlignmentForKey(key, value, persist = true) {
     if (key === 'hanzi') root.style.setProperty('--hanzi-overlay-justify', alignment === 'left' ? 'flex-start' : alignment === 'right' ? 'flex-end' : 'center');
     if (root.querySelector('.overlay-inline-controls')) syncOverlayInlineControls();
   }
+  document.querySelectorAll('[data-overlay-panel-align]').forEach(button => {
+    const [buttonKey, buttonAlignment] = button.dataset.overlayPanelAlign.split(':');
+    if (buttonKey !== key) return;
+    const selected = buttonAlignment === alignment;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
   if (persist) { try { saveSettings(); } catch (_) {} }
   return true;
 }
@@ -10689,35 +10799,32 @@ function overlayControlTargetForKey(key) {
   const z = Number.parseInt(getComputedStyle(layer.element).zIndex, 10);
   return {...layer,rect:layer.element.getBoundingClientRect(),hitKind:'toolbar',z:Number.isFinite(z)?z:0};
 }
-function updateOverlayShiftTarget(x,y) {
+function updateOverlayCtrlTarget(x,y) {
   if(Number.isFinite(x)&&Number.isFinite(y))overlayInteractionPointer={x,y};
   const container=document.getElementById('videoContainer');
   const hasPointer=!!(overlayInteractionPointer&&container);
-  const shiftActive=overlayInteractionShiftHeld&&hasPointer&&!audioOnlyMode;
-  const ctrlMode=overlayInteractionCtrlHeld&&!overlayInteractionShiftHeld&&hasPointer&&!audioOnlyMode;
-  const modifierActive=shiftActive||ctrlMode;
+  const ctrlMode=overlayInteractionCtrlHeld&&!playerControlsShiftHeld&&hasPointer&&!audioOnlyMode;
   const layers=overlayLayerConfigs();
   for(const layer of layers){
     if(!layer.element)continue;
     layer.element.classList.remove(overlayCtrlTargetClass,'ctrl-overlay-hidden-target');
     layer.element.removeAttribute('data-overlay-hidden-label');
-    if(modifierActive&&!layer.enabled){
+    if(ctrlMode&&!layer.enabled){
       layer.element.classList.add('ctrl-overlay-hidden-target');
       layer.element.setAttribute('data-overlay-hidden-label',layer.label+' 표시 꺼짐');
     }
   }
-  const target=modifierActive&&overlayInteractionToolbarKey
+  const target=ctrlMode&&overlayInteractionToolbarKey
     ?overlayControlTargetForKey(overlayInteractionToolbarKey)
-    :(hasPointer?findOverlayTextTargetAt(overlayInteractionPointer.x,overlayInteractionPointer.y):null);
+    :(ctrlMode&&hasPointer?findOverlayTextTargetAt(overlayInteractionPointer.x,overlayInteractionPointer.y):null);
   if(target?.element)target.element.classList.add(overlayCtrlTargetClass);
   syncOverlayInlineControls();
-  container?.classList.toggle('overlay-modifier-active',modifierActive);
+  container?.classList.toggle('overlay-modifier-active',ctrlMode);
 }
-
-function installOverlayShiftInteraction() {
+function installPlayerModifierInteraction() {
   const container = document.getElementById('videoContainer');
-  if (!container || container.dataset.overlayShiftReady === '1') return;
-  container.dataset.overlayShiftReady = '1';
+  if (!container || container.dataset.playerModifierReady === '1') return;
+  container.dataset.playerModifierReady = '1';
 
   const overlayScaleWheelRemainders = Object.create(null);
   let overlayScaleSaveTimer = null;
@@ -10744,13 +10851,13 @@ function installOverlayShiftInteraction() {
     try{if(container.hasPointerCapture(gesture.pointerId))container.releasePointerCapture(gesture.pointerId);}catch(_){}
     if(activate&&!gesture.moved)toggleOverlayForKey(gesture.key);
     if(gesture.moved)queueScaleSave(true);
-    updateOverlayShiftTarget(gesture.lastX,gesture.lastY);
+    updateOverlayCtrlTarget(gesture.lastX,gesture.lastY);
   };
   container.addEventListener('pointerdown',event=>{
     if(event.button!==0||event.pointerType==='touch'||isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton'))return;
-    if(!(event.ctrlKey||overlayInteractionCtrlHeld)||(event.shiftKey||overlayInteractionShiftHeld)||audioOnlyMode)return;
+    if(!(event.ctrlKey||overlayInteractionCtrlHeld)||(event.shiftKey||playerControlsShiftHeld)||audioOnlyMode)return;
     overlayInteractionCtrlHeld=true;
-    updateOverlayShiftTarget(event.clientX,event.clientY);
+    updateOverlayCtrlTarget(event.clientX,event.clientY);
     const target=findOverlayTextTargetAt(event.clientX,event.clientY);
     if(!target)return;
     event.preventDefault(); event.stopImmediatePropagation();
@@ -10769,7 +10876,7 @@ function installOverlayShiftInteraction() {
       const rect=container.getBoundingClientRect();
       if(rect.width>0&&rect.height>0){
         setOverlayPositionForKey(gesture.key,gesture.startPosition.x+dx/rect.width*100,gesture.startPosition.y+dy/rect.height*100,false);
-        updateOverlayShiftTarget(event.clientX,event.clientY);queueScaleSave(false);
+        updateOverlayCtrlTarget(event.clientX,event.clientY);queueScaleSave(false);
       }
     }
   },true);
@@ -10786,27 +10893,28 @@ function installOverlayShiftInteraction() {
   let modifierPointerFrame=0, modifierPointerPending=null;
   container.addEventListener('pointermove',event=>{
     if(event.pointerType==='touch')return;
+    if(event.shiftKey||playerControlsShiftHeld)openBottomFloatForShiftHover(event.target);
     const overlayControl=event.target instanceof Element?event.target.closest('.overlay-inline-controls'):null;
     overlayInteractionToolbarKey=overlayControl?.dataset.overlayOptionKey||'';
     modifierPointerPending={x:event.clientX,y:event.clientY};
     if(overlayInteractionToolbarKey){
       if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
       modifierPointerFrame=0;modifierPointerPending=null;
-      updateOverlayShiftTarget(event.clientX,event.clientY);
+      updateOverlayCtrlTarget(event.clientX,event.clientY);
       return;
     }
     if(modifierPointerFrame)return;
     modifierPointerFrame=requestAnimationFrame(()=>{
       modifierPointerFrame=0;
       const point=modifierPointerPending;modifierPointerPending=null;
-      if(point)updateOverlayShiftTarget(point.x,point.y);
+      if(point)updateOverlayCtrlTarget(point.x,point.y);
     });
   },{passive:true});
   container.addEventListener('pointerleave',()=>{
     if(ctrlOverlayGesture)return;
     overlayInteractionPointer=null;overlayInteractionToolbarKey='';modifierPointerPending=null;
     if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
-    modifierPointerFrame=0;updateOverlayShiftTarget();
+    modifierPointerFrame=0;updateOverlayCtrlTarget();
   });
 
   const applyWheelScale=(key,event,mode)=>{
@@ -10820,7 +10928,7 @@ function installOverlayShiftInteraction() {
     const current=overlayScaleValueForKey(key),next=normalizeOverlayScale(current-steps*0.05);
     if(next===null||next===current)return;
     setOverlayScaleValueForKey(key,next,false);
-    syncOverlayInlineControls();updateOverlayShiftTarget(event.clientX,event.clientY);queueScaleSave(false);
+    syncOverlayInlineControls();updateOverlayCtrlTarget(event.clientX,event.clientY);queueScaleSave(false);
   };
   container.addEventListener('wheel',event=>{
     if(!event.deltaY||audioOnlyMode)return;
@@ -10832,7 +10940,6 @@ function installOverlayShiftInteraction() {
       if(key)applyWheelScale(key,event,'ctrlShift');
       return;
     }
-    if(event.shiftKey){event.preventDefault();event.stopPropagation();return;}
     if(!event.ctrlKey)return;
     const target=inlineControl?overlayControlTargetForKey(inlineControl.dataset.overlayOptionKey):findOverlayTextTargetAt(event.clientX,event.clientY);
     if(!target)return;
@@ -10841,31 +10948,27 @@ function installOverlayShiftInteraction() {
 
   const handleModifier=event=>{
     const down=event.type==='keydown';
-    if(event.key==='Shift'||event.code==='ShiftLeft'||event.code==='ShiftRight')overlayInteractionShiftHeld=down;
+    if(event.key==='Shift'||event.code==='ShiftLeft'||event.code==='ShiftRight'){playerControlsShiftHeld=down;if(down)openBottomFloatForShiftHover(event.target);}
     else if(event.key==='Control'||event.code==='ControlLeft'||event.code==='ControlRight')overlayInteractionCtrlHeld=down;
     else return;
-    updateOverlayShiftTarget();
+    updateOverlayCtrlTarget();
   };
   window.addEventListener('keydown',handleModifier,true);
   window.addEventListener('keyup',handleModifier,true);
-  window.addEventListener('blur',()=>{overlayInteractionShiftHeld=false;overlayInteractionCtrlHeld=false;updateOverlayShiftTarget();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){overlayInteractionShiftHeld=false;overlayInteractionCtrlHeld=false;updateOverlayShiftTarget();}});
+  window.addEventListener('blur',()=>{playerControlsShiftHeld=false;overlayInteractionCtrlHeld=false;updateOverlayCtrlTarget();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){playerControlsShiftHeld=false;overlayInteractionCtrlHeld=false;updateOverlayCtrlTarget();}});
 
-  container.addEventListener('click',event=>{
-    if((!event.shiftKey&&!overlayInteractionShiftHeld)||audioOnlyMode||isInlineControl(event.target))return;
-    const target=findOverlayTextTargetAt(event.clientX,event.clientY);
-    if(!target)return;
-    event.preventDefault();event.stopImmediatePropagation();toggleOverlayForKey(target.key);updateOverlayShiftTarget(event.clientX,event.clientY);
-  },true);
+
   window.addEventListener('message',event=>{
     if(event.source!==window.parent)return;
     const message=event.data;
-    if(!message||message.llt!=='vp-overlay-shift-state')return;
-    overlayInteractionShiftHeld=message.down===true;
+    if(!message||message.llt!=='vp-player-controls-modifier-state')return;
+    playerControlsShiftHeld=message.down===true;
     overlayInteractionCtrlHeld=message.ctrlDown===true;
-    updateOverlayShiftTarget();
+    if(playerControlsShiftHeld)openBottomFloatForShiftHover();
+    updateOverlayCtrlTarget();
   });
-  updateOverlayShiftTarget();
+  updateOverlayCtrlTarget();
 }
 
 // ===== 번역/한자 영상 위 오버레이 =====
@@ -10876,7 +10979,7 @@ let hanziVideoOverlayEnabled = false;
 function toggleTransVideoOverlay() {
   transVideoOverlayEnabled = !transVideoOverlayEnabled;
   document.getElementById('transVideoOverlay').classList.toggle('active', transVideoOverlayEnabled);
-  updateOverlayShiftTarget();
+  updateOverlayCtrlTarget();
   syncOverlayInlineControls();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
@@ -10885,7 +10988,7 @@ function toggleTransVideoOverlay() {
 function toggleHanziVideoOverlay() {
   hanziVideoOverlayEnabled = !hanziVideoOverlayEnabled;
   document.getElementById('hanziVideoOverlay').classList.toggle('active', hanziVideoOverlayEnabled);
-  updateOverlayShiftTarget();
+  updateOverlayCtrlTarget();
   syncOverlayInlineControls();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch(_) {}
@@ -10903,6 +11006,19 @@ function overlayPositionForKey(key) {
   const value = overlayPositions[key] || fallback;
   return {x:value.x,y:value.y};
 }
+function syncOverlayPositionControlsForKey(key) {
+  const prefix = key === 'subtitle' ? 'sub' : key === 'translation' ? 'trans' : key === 'hanzi' ? 'hanzi' : '';
+  if (!prefix) return;
+  const position = overlayPositionForKey(key);
+  const xInput = document.getElementById(prefix + 'OverlayXSlider');
+  const yInput = document.getElementById(prefix + 'OverlayYSlider');
+  const xOutput = document.getElementById(prefix + 'OverlayXValue');
+  const yOutput = document.getElementById(prefix + 'OverlayYValue');
+  if (xInput) xInput.value = String(position.x);
+  if (yInput) yInput.value = String(position.y);
+  if (xOutput) xOutput.textContent = Math.round(position.x) + '%';
+  if (yOutput) yOutput.textContent = Math.round(position.y) + '%';
+}
 function setOverlayPositionForKey(key,x,y,persist=false) {
   if (!DEFAULT_OVERLAY_POSITIONS[key]) return false;
   const current = overlayPositionForKey(key), nx=Number(x), ny=Number(y);
@@ -10912,8 +11028,19 @@ function setOverlayPositionForKey(key,x,y,persist=false) {
   document.documentElement.style.setProperty('--'+suffix+'-overlay-y',overlayPositions[key].y+'%');
   const rootId = key === 'subtitle' ? 'subtitleVideoOverlay' : key === 'translation' ? 'transVideoOverlay' : 'hanziVideoOverlay';
   if (document.getElementById(rootId)?.querySelector('.overlay-inline-controls')) syncOverlayInlineControls();
+  syncOverlayPositionControlsForKey(key);
   if (persist) { try { saveSettings(); } catch (_) {} }
   return true;
+}
+function setOverlayPositionAxis(key, axis, value, persist=false) {
+  if (axis !== 'x' && axis !== 'y') return false;
+  const current = overlayPositionForKey(key);
+  return setOverlayPositionForKey(key, axis === 'x' ? value : current.x, axis === 'y' ? value : current.y, persist);
+}
+function resetOverlayPositionForKey(key) {
+  const position = DEFAULT_OVERLAY_POSITIONS[key];
+  if (!position) return false;
+  return setOverlayPositionForKey(key, position.x, position.y, true);
 }
 function getOverlayPositionSnapshot() {
   return {subtitle:overlayPositionForKey('subtitle'),translation:overlayPositionForKey('translation'),hanzi:overlayPositionForKey('hanzi')};
@@ -10968,7 +11095,7 @@ let subOverlayMode = false;
 function toggleSubOverlay() {
   subOverlayMode = !subOverlayMode;
   document.getElementById('subtitleVideoOverlay')?.classList.toggle('active',subOverlayMode);
-  updateOverlayShiftTarget(); syncOverlayInlineControls();
+  updateOverlayCtrlTarget(); syncOverlayInlineControls();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch (_) {}
 }
@@ -11093,7 +11220,7 @@ function installVideoTouchGestures() {
 
   container.addEventListener('touchcancel', cancelGesture, { passive: true });
 }
-installOverlayShiftInteraction();
+installPlayerModifierInteraction();
 installVideoTouchGestures();
 installBottomFloatHoverControls();
 // ===== 레이아웃 프리셋 =====
