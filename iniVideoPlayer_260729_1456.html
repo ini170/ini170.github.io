@@ -7737,6 +7737,42 @@ async function triggerTtsPhase(sub, afterTts) {
   playTtsSequence(items, 0, wrappedAfterTts);
 }
 
+function _requestParentSrtWrite(payload){
+  return new Promise(resolve => {
+    const requestId = 'srt-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
+      resolve(result);
+    };
+    const onMessage = event => {
+      if (event.source !== window.parent) return;
+      const response = event.data;
+      if (!response || response.llt !== 'vp-access-srt-write-result' || response.requestId !== requestId) return;
+      finish(response.result && typeof response.result === 'object'
+        ? response.result
+        : { ok:false, code:'invalid-response', message:'상위 페이지에서 SRT 저장 결과를 확인하지 못했습니다.' });
+    };
+    const timer = setTimeout(() => finish({
+      ok:false, code:'host-timeout',
+      message:'상위 페이지의 SRT 저장 응답이 없습니다. 파일과 재생 자막은 변경하지 않았습니다.'
+    }), 95000);
+    window.addEventListener('message', onMessage);
+    try {
+      window.parent.postMessage({
+        llt:'vp-access-srt-write', requestId, payload, userGesture:true
+      }, '*');
+    } catch (error) {
+      finish({
+        ok:false, code:'bridge',
+        message:'상위 페이지의 SRT 저장 연결에 실패했습니다. 파일과 재생 자막은 변경하지 않았습니다.'
+      });
+    }
+  });
+}
 async function applyEdit(event){
   if (!event || event.isTrusted !== true) {
     showTimeDisplay('SRT 저장은 적용 버튼을 직접 눌러 실행해 주세요.', 5000);
@@ -7764,15 +7800,28 @@ async function applyEdit(event){
     sourceRootName:String(item.sourceRootName || '')
   };
   if (_isEmbeddedPlaylistPlayer() && window.parent !== window) {
+    let parentBridgeUnavailable = false;
     try {
       const parentWriter = parent.vpAccessHostWriteSrtFromPlayer;
       if (typeof parentWriter === 'function') {
         parentBridgeUsed = true;
         saveResult = await parentWriter(payload, true);
+      } else {
+        parentBridgeUnavailable = true;
       }
     } catch (error) {
-      console.warn('[SRT edit] 상위 파일 저장 요청 실패', error);
-      saveResult = { ok:false, message:'상위 페이지의 SRT 파일 저장 연결에 실패했습니다. 파일은 변경하지 않았습니다.' };
+      // file:// iframe 간 전역 객체 접근은 차단될 수 있으므로 검증된 message bridge로 전환한다.
+      console.warn('[SRT edit] 상위 파일 저장 직접 연결을 사용할 수 없어 메시지 브리지로 전환합니다.', error);
+      parentBridgeUnavailable = true;
+    }
+    if (parentBridgeUnavailable) {
+      parentBridgeUsed = true;
+      try {
+        saveResult = await _requestParentSrtWrite(payload);
+      } catch (error) {
+        console.warn('[SRT edit] 상위 메시지 저장 요청 실패', error);
+        saveResult = { ok:false, code:'bridge', message:'상위 페이지의 SRT 저장 연결에 실패했습니다. 파일과 재생 자막은 변경하지 않았습니다.' };
+      }
     }
   }
 
