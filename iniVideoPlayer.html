@@ -774,67 +774,25 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   0%,100% { opacity:1; } 50% { opacity:0.3; }
 }
 
-/* ===== 영상 위 자막 오버레이 ===== */
-#overlay.on-video {
-  position: absolute !important;
-  bottom: 8% !important;
-  left: 50% !important;
-  transform: translateX(-50%) scale(var(--sub-overlay-scale, 1)) !important;
-  transform-origin: bottom center !important;
-  width: 90% !important;
-  z-index: 20 !important;
-  text-align: center;
-  pointer-events: none;
-  text-shadow: 0 0 6px #000, 0 2px 8px #000;
-}
-
-/* ===== 번역 영상 위 오버레이 (중단 고정) ===== */
-#transVideoOverlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(var(--trans-overlay-scale, 1));
-  transform-origin: center center;
-  width: 90%;
-  text-align: center;
-  pointer-events: none;
-  z-index: 22;
-  background: rgba(0, 0, 10, 0.58);
-  border-radius: 6px;
-  padding: 6px 12px;
-  min-height: 4em;
-  display: none;
-  box-sizing: border-box;
-}
-#transVideoOverlay.active { display: block; }
-#transVideoOverlay .tvo-zh   { font-size: 14px; color: #e8e8ff; line-height: 1.4; }
-#transVideoOverlay .tvo-pyen { font-size: 10px; color: #7788aa; line-height: 1.5; margin-top: 1px; }
-#transVideoOverlay .tvo-ko   { font-size: 12px; color: #99aab8; line-height: 1.4; margin-top: 1px; }
-
-/* ===== 한자 영상 위 오버레이 (상단 고정) ===== */
-#hanziVideoOverlay {
-  position: absolute;
-  top: 3%;
-  left: 50%;
-  transform: translateX(-50%) scale(var(--hanzi-overlay-scale, 1));
-  transform-origin: top center;
-  width: 96%;
-  pointer-events: none;
-  z-index: 22;
-  background: rgba(0, 8, 0, 0.58);
-  border-radius: 6px;
-  padding: 4px 8px;
-  min-height: 82px;
-  display: none;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-  align-items: flex-start;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-#hanziVideoOverlay.active { display: flex; }
-
+/* ===== 영상 위 세 문자열 오버레이 ===== */
+#subtitleVideoOverlay { position:absolute; top:var(--sub-overlay-y,84%); left:var(--sub-overlay-x,50%); transform:translate(-50%,-50%) scale(var(--sub-overlay-scale,1)); transform-origin:center; width:90%; z-index:20; text-align:center; pointer-events:none; text-shadow:0 0 6px #000,0 2px 8px #000; display:none; box-sizing:border-box; }
+#subtitleVideoOverlay.active { display:block; }
+#transVideoOverlay { position:absolute; top:var(--trans-overlay-y,50%); left:var(--trans-overlay-x,50%); transform:translate(-50%,-50%) scale(var(--trans-overlay-scale,1)); transform-origin:center; width:90%; text-align:center; pointer-events:none; z-index:22; background:rgba(0,0,10,.58); border-radius:6px; padding:6px 12px; min-height:4em; display:none; box-sizing:border-box; }
+#transVideoOverlay.active { display:block; }
+#transVideoOverlay .tvo-zh { font-size:14px; color:#e8e8ff; line-height:1.4; }
+#transVideoOverlay .tvo-pyen { font-size:10px; color:#7788aa; line-height:1.5; margin-top:1px; }
+#transVideoOverlay .tvo-ko { font-size:12px; color:#99aab8; line-height:1.4; margin-top:1px; }
+#hanziVideoOverlay { position:absolute; top:var(--hanzi-overlay-y,15%); left:var(--hanzi-overlay-x,50%); transform:translate(-50%,-50%) scale(var(--hanzi-overlay-scale,1)); transform-origin:center; width:96%; pointer-events:none; z-index:22; background:rgba(0,8,0,.58); border-radius:6px; padding:4px 8px; min-height:82px; display:none; flex-wrap:wrap; justify-content:center; gap:4px; align-items:flex-start; box-sizing:border-box; overflow:hidden; }
+#hanziVideoOverlay.active { display:flex; }
+#subtitleVideoOverlay.ctrl-overlay-target { text-shadow:0 0 6px #000,0 2px 8px #000,0 0 7px rgba(79,195,247,.95) !important; }
+#transVideoOverlay.ctrl-overlay-target .tvo-zh,#transVideoOverlay.ctrl-overlay-target .tvo-pyen,#transVideoOverlay.ctrl-overlay-target .tvo-ko,#hanziVideoOverlay.ctrl-overlay-target .char-card { filter:drop-shadow(0 0 3px rgba(79,195,247,.95)); }
+#subtitleVideoOverlay.ctrl-overlay-hidden-target,#transVideoOverlay.ctrl-overlay-hidden-target,#hanziVideoOverlay.ctrl-overlay-hidden-target { display:block !important; visibility:visible !important; opacity:.82 !important; pointer-events:none !important; outline:2px dashed rgba(79,195,247,.9); background:rgba(5,18,28,.76) !important; border-radius:6px; min-height:48px; box-sizing:border-box; overflow:visible; }
+#hanziVideoOverlay.ctrl-overlay-hidden-target { display:flex !important; }
+#subtitleVideoOverlay.ctrl-overlay-hidden-target::after,#transVideoOverlay.ctrl-overlay-hidden-target::after,#hanziVideoOverlay.ctrl-overlay-hidden-target::after { content:attr(data-overlay-hidden-label); position:absolute; inset:0; z-index:3; display:grid; place-items:center; padding:4px 8px; color:#d8f4ff; font:700 12px/1.25 system-ui,sans-serif; text-align:center; text-shadow:0 1px 3px #000; pointer-events:none; }
+#videoContainerFullscreenButton { position:absolute; z-index:1002; top:8px; right:8px; display:none; min-width:42px; min-height:38px; align-items:center; justify-content:center; border:1px solid rgba(190,210,225,.55); border-radius:6px; background:rgba(5,10,16,.78); color:#e8f6ff; font:700 13px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+#videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { display:flex; }
+#videoContainer:fullscreen,#videoContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; max-width:100vw !important; max-height:100vh !important; flex:none !important; border:0 !important; border-radius:0 !important; background:#000 !important; }
+#videoContainer:fullscreen > video,#videoContainer:-webkit-full-screen > video { width:100% !important; height:100% !important; object-fit:contain; }
 /* ===== Ctrl target sizing and temporary Shift options palette ===== */
 #overlay.on-video.ctrl-overlay-target {
   text-shadow: 0 0 6px #000, 0 2px 8px #000, 0 0 7px rgba(79,195,247,.95) !important;
@@ -865,6 +823,12 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #overlayOptionPalette .overlay-option-value { color:#81d4fa; text-align:right; font-variant-numeric:tabular-nums; }
 @media (pointer:coarse) { #overlayOptionPalette .overlay-option-slider { height:40px; } }
 
+#overlayOptionPalette .overlay-option-help { margin:0 0 4px; color:#98b8c8; font-size:10px; line-height:1.3; }
+#overlayOptionPalette .overlay-option-position { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr auto; gap:4px; padding:2px 0 6px; border-bottom:1px solid rgba(130,160,180,.18); }
+#overlayOptionPalette .overlay-option-position-control { display:grid; grid-template-columns:28px minmax(0,1fr) 36px; align-items:center; gap:3px; color:#a9c7d6; font-size:10px; }
+#overlayOptionPalette .overlay-option-position-control input { width:100%; min-width:0; height:26px; margin:0; accent-color:#4fc3f7; touch-action:pan-y; }
+#overlayOptionPalette .overlay-option-reset { align-self:center; min-height:34px; padding:4px 7px; border:1px solid #526b78; border-radius:5px; background:#19252c; color:#c7e6f4; font-size:10px; cursor:pointer; }
+@media (pointer:coarse) { #overlayOptionPalette .overlay-option-position-control input { height:38px; } }
 /* ===== 오디오 전용 모드 바 ===== */
 
 #audioModeBar {
@@ -1018,7 +982,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   <div id="leftPanel" style="display: flex; flex-direction: column; flex: 1 1 0%; min-width: 200px; overflow: hidden; position: relative;">
     <!-- 비디오 -->
     <div id="videoContainer" style="border: 2px dashed rgb(102, 102, 102); border-radius: 5px; background: rgb(0, 0, 0); flex: 0 0 324px; position: relative; overflow: hidden;">
-      <video id="video" controls style="width:100%; height:100%; display:block; object-fit:contain;"></video>
+      <video id="video" controls controlslist="nofullscreen" style="width:100%; height:100%; display:block; object-fit:contain;"></video>
       <div id="playlistPermissionGate" role="status" aria-live="polite">
         <div class="permission-card">
           <div id="playlistPermissionTitle" class="permission-title">재생목록 전체 파일 권한이 필요합니다</div>
@@ -1029,8 +993,10 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       </div>
       <!-- 드래그 수신용 투명 오버레이 (video 위에서 이벤트 가로채기) -->
       <div id="dropOverlay" style="position:absolute;inset:0;z-index:10;pointer-events:none;"></div>
-      <!-- Ctrl 호버는 현재 문자열을 크기 조절 대상으로 강조하고, Shift 호버는 임시 전체 옵션을 띄웁니다. -->
-      <!-- 번역 영상 위 오버레이 (중단 고정) -->
+      <!-- Ctrl 호버 중 꺼진 문자열도 조작 구역으로 표시합니다. -->
+      <div id="subtitleVideoOverlay" aria-hidden="true"></div>
+      <button id="videoContainerFullscreenButton" type="button" aria-label="플레이어 전체화면" title="플레이어 전체화면" onclick="toggleVideoContainerFullscreen(event)">⛶</button>
+      <!-- 번역 영상 위 오버레이 -->
 
       <div id="transVideoOverlay">
         <div class="tvo-zh"></div>
@@ -1515,6 +1481,31 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 
 <script>
 const video = document.getElementById('video');
+function syncContainerFullscreenButton() {
+  const button = document.getElementById('videoContainerFullscreenButton');
+  const container = document.getElementById('videoContainer');
+  if (!button || !container) return;
+  const active = document.fullscreenElement === container || document.webkitFullscreenElement === container;
+  button.textContent = active ? '⛶ 종료' : '⛶';
+  button.setAttribute('aria-label', active ? '플레이어 전체화면 종료' : '플레이어 전체화면');
+  button.title = active ? '플레이어 전체화면 종료' : '플레이어 전체화면';
+}
+async function toggleVideoContainerFullscreen(event) {
+  event?.preventDefault(); event?.stopPropagation();
+  const container = document.getElementById('videoContainer');
+  try {
+    if (document.fullscreenElement === container || document.webkitFullscreenElement === container) {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      return;
+    }
+    if (container?.requestFullscreen) await container.requestFullscreen({ navigationUI:'hide' });
+    else if (container?.webkitRequestFullscreen) container.webkitRequestFullscreen();
+    else showTimeDisplay('이 브라우저는 플레이어 전체화면을 지원하지 않습니다.');
+  } catch (error) { showTimeDisplay('플레이어 전체화면 전환 실패: ' + String(error?.message || error)); }
+}
+document.addEventListener('fullscreenchange', syncContainerFullscreenButton);
+document.addEventListener('webkitfullscreenchange', syncContainerFullscreenButton);
 let activePlaylistVideoUrl = null;
 function _releasePlaylistVideoUrl() {
   const url = activePlaylistVideoUrl;
@@ -1537,6 +1528,16 @@ function _setPlaylistVideoSource(file) {
   }
 }
 const overlay = document.getElementById('overlay');
+const subtitleVideoOverlay = document.getElementById('subtitleVideoOverlay');
+function syncVideoSubtitleOverlayContent() {
+  if (!overlay || !subtitleVideoOverlay) return;
+  subtitleVideoOverlay.replaceChildren(...Array.from(overlay.childNodes, node => node.cloneNode(true)));
+}
+syncVideoSubtitleOverlayContent();
+if (window.MutationObserver && overlay) {
+  const subtitleVideoOverlayObserver = new MutationObserver(syncVideoSubtitleOverlayContent);
+  subtitleVideoOverlayObserver.observe(overlay, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['style','class'] });
+}
 const playlistDiv = document.getElementById('playlist');
 const subsDiv = document.getElementById('subs');
 const editor = document.getElementById('editor');
@@ -7241,7 +7242,7 @@ function saveSettings() {
         transOv: transVideoOverlayEnabled,
         hanziOv: hanziVideoOverlayEnabled,
         subtitleScale, translationPanelScale, charDictPanelScale,
-        subOverlayScale, transOverlayScale, hanziOverlayScale
+        subOverlayScale, transOverlayScale, hanziOverlayScale, overlayPositions:getOverlayPositionSnapshot()
       }
     };
     obj._savedAt = Math.max(
@@ -7330,6 +7331,7 @@ function applyPendingLayout() {
   if (Number.isFinite(L.subOverlayScale)   && L.subOverlayScale > 0)   setSubOverlayScaleFromSlider(L.subOverlayScale, false);
   if (Number.isFinite(L.transOverlayScale) && L.transOverlayScale > 0) setTransOverlayScaleFromSlider(L.transOverlayScale, false);
   if (Number.isFinite(L.hanziOverlayScale) && L.hanziOverlayScale > 0) setHanziOverlayScaleFromSlider(L.hanziOverlayScale, false);
+  if (L.overlayPositions) applyOverlayPositionSnapshot(L.overlayPositions);
   _pendingLayout = null;
 }
 
@@ -10525,30 +10527,34 @@ function getOverlayTextRects(root) {
   return rects;
 }
 
-function findOverlayTextTargetAt(x, y) {
-  if (!Number.isFinite(x) || !Number.isFinite(y) || audioOnlyMode) return null;
-  const layers = [
-    { key:'subtitle', element:document.getElementById('overlay'), enabled:subOverlayMode },
-    { key:'translation', element:document.getElementById('transVideoOverlay'), enabled:transVideoOverlayEnabled },
-    { key:'hanzi', element:document.getElementById('hanziVideoOverlay'), enabled:hanziVideoOverlayEnabled },
+function overlayLayerConfigs() {
+  return [
+    {key:'subtitle',label:'자막',element:document.getElementById('subtitleVideoOverlay'),enabled:subOverlayMode},
+    {key:'translation',label:'번역',element:document.getElementById('transVideoOverlay'),enabled:transVideoOverlayEnabled},
+    {key:'hanzi',label:'한자',element:document.getElementById('hanziVideoOverlay'),enabled:hanziVideoOverlayEnabled},
   ];
-  const matches = [];
-  for (const layer of layers) {
-    if (!layer.enabled || !layer.element) continue;
-    const rect = getOverlayTextRects(layer.element).find(r =>
-      x >= r.left - 3 && x <= r.right + 3 && y >= r.top - 3 && y <= r.bottom + 3);
-    if (!rect) continue;
-    const z = Number.parseInt(getComputedStyle(layer.element).zIndex, 10);
-    matches.push({ ...layer, rect, z:Number.isFinite(z) ? z : 0 });
-  }
-  matches.sort((a,b) => {
-    if (a.z !== b.z) return b.z - a.z;
-    const position = a.element.compareDocumentPosition(b.element);
-    return position & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1;
-  });
-  return matches[0] || null;
 }
-
+function findOverlayTextTargetAt(x,y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || audioOnlyMode) return null;
+  const matches=[];
+  for (const layer of overlayLayerConfigs()) {
+    if (!layer.element) continue;
+    let rect=null, hitKind='';
+    if (layer.enabled) {
+      rect=getOverlayTextRects(layer.element).find(r=>x>=r.left-4&&x<=r.right+4&&y>=r.top-4&&y<=r.bottom+4)||null;
+      if (!rect) continue;
+      hitKind='text';
+    } else if (layer.element.classList.contains('ctrl-overlay-hidden-target')) {
+      const zone=layer.element.getBoundingClientRect();
+      if(zone.width>0&&zone.height>0&&x>=zone.left&&x<=zone.right&&y>=zone.top&&y<=zone.bottom){rect=zone;hitKind='hidden';}
+    }
+    if(!rect) continue;
+    const z=Number.parseInt(getComputedStyle(layer.element).zIndex,10);
+    matches.push({...layer,rect,hitKind,z:Number.isFinite(z)?z:0});
+  }
+  matches.sort((a,b)=>a.hitKind!==b.hitKind?(a.hitKind==='text'?-1:1):b.z-a.z);
+  return matches[0]||null;
+}
 function overlayScaleValueForKey(key) {
   if (key === 'subtitle') return subOverlayScale;
   if (key === 'translation') return transOverlayScale;
@@ -10573,28 +10579,23 @@ function toggleOverlayForKey(key) {
 }
 function syncOverlayOptionPalette() {
   if (!overlayOptionPaletteNode) return;
-  const options = [
-    { key:'subtitle', label:'자막' },
-    { key:'translation', label:'번역' },
-    { key:'hanzi', label:'한자' },
-  ];
+  const options=[{key:'subtitle',label:'자막'},{key:'translation',label:'번역'},{key:'hanzi',label:'한자'}];
   for (const option of options) {
-    const button = document.getElementById(`overlayOptionToggle-${option.key}`);
-    const slider = document.getElementById(`overlayOptionSlider-${option.key}`);
-    const output = document.getElementById(`overlayOptionValue-${option.key}`);
-    const enabled = overlayEnabledForKey(option.key);
-    const scale = overlayScaleValueForKey(option.key);
-    if (button) {
-      button.textContent = enabled ? '표시' : '숨김';
-      button.classList.toggle('active', enabled);
-      button.setAttribute('aria-pressed', String(enabled));
-      button.setAttribute('aria-label', `${option.label} 영상 위 표시 ${enabled ? '끄기' : '켜기'}`);
-    }
-    if (slider && Number.isFinite(scale) && document.activeElement !== slider) slider.value = String(scale);
-    if (output && Number.isFinite(scale)) output.textContent = `${Math.round(scale * 100)}%`;
+    const button=document.getElementById('overlayOptionToggle-'+option.key);
+    const slider=document.getElementById('overlayOptionSlider-'+option.key);
+    const output=document.getElementById('overlayOptionValue-'+option.key);
+    const x=document.getElementById('overlayOptionPosX-'+option.key), xv=document.getElementById('overlayOptionPosXValue-'+option.key);
+    const y=document.getElementById('overlayOptionPosY-'+option.key), yv=document.getElementById('overlayOptionPosYValue-'+option.key);
+    const enabled=overlayEnabledForKey(option.key), scale=overlayScaleValueForKey(option.key), position=overlayPositionForKey(option.key);
+    if(button){button.textContent=enabled?'표시 중':'숨김';button.classList.toggle('active',enabled);button.setAttribute('aria-pressed',String(enabled));button.setAttribute('aria-label',option.label+' 영상 위 표시 '+(enabled?'끄기':'켜기'));}
+    if(slider&&Number.isFinite(scale)&&document.activeElement!==slider)slider.value=String(scale);
+    if(output&&Number.isFinite(scale))output.textContent=Math.round(scale*100)+'%';
+    if(x&&document.activeElement!==x)x.value=String(position.x);
+    if(xv)xv.textContent='X '+Math.round(position.x)+'%';
+    if(y&&document.activeElement!==y)y.value=String(position.y);
+    if(yv)yv.textContent='Y '+Math.round(position.y)+'%';
   }
 }
-
 function ensureOverlayModifierControls(container, queueScaleSave) {
   if (overlayOptionPaletteNode && overlayScaleHintNode) return;
   const palette = document.createElement('div');
@@ -10606,8 +10607,12 @@ function ensureOverlayModifierControls(container, queueScaleSave) {
   const title = document.createElement('span');
   title.textContent = '영상 표시 옵션';
   const help = document.createElement('span');
-  help.textContent = 'Ctrl+Shift+휠: 크기';
+  help.textContent = 'Shift+호버: 전체 옵션';
   heading.append(title, help);
+  const detail = document.createElement('div');
+  detail.className = 'overlay-option-help';
+  detail.textContent = 'Ctrl 호버: 꺼진 문자열도 조작 · 클릭 켜기/끄기 · 드래그 이동 · 휠 크기';
+  palette.appendChild(detail);
   palette.appendChild(heading);
 
   const options = [
@@ -10651,7 +10656,35 @@ function ensureOverlayModifierControls(container, queueScaleSave) {
     output.id = `overlayOptionValue-${option.key}`;
     output.className = 'overlay-option-value';
     row.append(name, toggle, slider, output);
+    const positionControls=document.createElement('div');
+    positionControls.className='overlay-option-position';
+    for (const axis of [{key:'X',label:'가로'},{key:'Y',label:'세로'}]) {
+      const control=document.createElement('label'); control.className='overlay-option-position-control';
+      const axisLabel=document.createElement('span'); axisLabel.textContent=axis.label;
+      const positionSlider=document.createElement('input'); positionSlider.type='range';
+      positionSlider.id='overlayOptionPos'+axis.key+'-'+option.key;
+      positionSlider.min='2'; positionSlider.max='98'; positionSlider.step='1';
+      positionSlider.dataset.overlayOptionKey=option.key;
+      positionSlider.setAttribute('aria-label',option.label+' 위치 '+axis.label);
+      positionSlider.addEventListener('input',()=>{
+        const position=overlayPositionForKey(option.key);
+        setOverlayPositionForKey(option.key,axis.key==='X'?positionSlider.value:position.x,axis.key==='Y'?positionSlider.value:position.y,false);
+        syncOverlayOptionPalette(); queueScaleSave(false);
+      });
+      positionSlider.addEventListener('change',()=>queueScaleSave(true));
+      const value=document.createElement('output'); value.id='overlayOptionPos'+axis.key+'Value-'+option.key;
+      value.className='overlay-option-value'; control.append(axisLabel,positionSlider,value); positionControls.appendChild(control);
+    }
+    const resetPosition=document.createElement('button'); resetPosition.type='button';
+    resetPosition.className='overlay-option-reset'; resetPosition.textContent='기본 위치';
+    resetPosition.addEventListener('click',event=>{
+      event.preventDefault(); event.stopPropagation();
+      const position=DEFAULT_OVERLAY_POSITIONS[option.key];
+      setOverlayPositionForKey(option.key,position.x,position.y,false); queueScaleSave(true);
+    });
+    positionControls.appendChild(resetPosition);
     palette.appendChild(row);
+    palette.appendChild(positionControls);
   }
   container.appendChild(palette);
   overlayOptionPaletteNode = palette;
@@ -10680,49 +10713,42 @@ function placeOverlayFloatingElement(element, container, target, x, y, anchorToT
   element.style.top = `${top}px`;
 }
 
-function updateOverlayShiftTarget(x, y) {
-  if (Number.isFinite(x) && Number.isFinite(y)) overlayInteractionPointer = { x, y };
-  const targets = [
-    document.getElementById('overlay'),
-    document.getElementById('transVideoOverlay'),
-    document.getElementById('hanziVideoOverlay'),
-  ];
-  targets.forEach(element => element?.classList.remove(overlayCtrlTargetClass));
-
-  const container = document.getElementById('videoContainer');
-  if (!overlayInteractionShiftHeld) overlayInteractionPointerOverPalette = false;
-  const hasPointer = !!(overlayInteractionPointer && container);
-  const target = hasPointer && !overlayInteractionPointerOverPalette &&
-    (overlayInteractionShiftHeld || overlayInteractionCtrlHeld) ?
-    findOverlayTextTargetAt(overlayInteractionPointer.x, overlayInteractionPointer.y) : null;
-  const shiftActive = overlayInteractionShiftHeld && hasPointer && !audioOnlyMode;
-  const ctrlActive = overlayInteractionCtrlHeld && !overlayInteractionShiftHeld && !!target;
-
-  if (ctrlActive && target) {
+function updateOverlayShiftTarget(x,y) {
+  if(Number.isFinite(x)&&Number.isFinite(y))overlayInteractionPointer={x,y};
+  const container=document.getElementById('videoContainer');
+  if(!overlayInteractionShiftHeld)overlayInteractionPointerOverPalette=false;
+  const hasPointer=!!(overlayInteractionPointer&&container);
+  const shiftActive=overlayInteractionShiftHeld&&hasPointer&&!audioOnlyMode;
+  const ctrlMode=overlayInteractionCtrlHeld&&!overlayInteractionShiftHeld&&hasPointer&&!audioOnlyMode;
+  const layers=overlayLayerConfigs();
+  for(const layer of layers){
+    if(!layer.element)continue;
+    layer.element.classList.remove(overlayCtrlTargetClass,'ctrl-overlay-hidden-target');
+    layer.element.removeAttribute('data-overlay-hidden-label');
+    if(ctrlMode&&!layer.enabled){
+      layer.element.classList.add('ctrl-overlay-hidden-target');
+      layer.element.setAttribute('data-overlay-hidden-label',layer.label+' 숨김 · Ctrl+클릭 켜기 · 드래그 이동');
+    }
+  }
+  const target=hasPointer&&!overlayInteractionPointerOverPalette&&(shiftActive||ctrlMode)
+    ?findOverlayTextTargetAt(overlayInteractionPointer.x,overlayInteractionPointer.y):null;
+  const ctrlActive=ctrlMode&&!!target;
+  if(ctrlActive){
     target.element.classList.add(overlayCtrlTargetClass);
-    if (overlayScaleHintNode && container) {
-      const label = target.key === 'subtitle' ? '자막' : target.key === 'translation' ? '번역' : '한자';
-      overlayScaleHintNode.textContent = `${label} ${Math.round(overlayScaleValueForKey(target.key) * 100)}% · Ctrl+휠`;
-      overlayScaleHintNode.style.display = 'block';
-      placeOverlayFloatingElement(overlayScaleHintNode, container, target, overlayInteractionPointer.x, overlayInteractionPointer.y, true);
+    overlayScaleHintNode.textContent=target.enabled
+      ?target.label+' '+Math.round(overlayScaleValueForKey(target.key)*100)+'% · Ctrl+클릭 표시/숨김 · 드래그 위치 · 휠 크기'
+      :target.label+' 숨김 · Ctrl+클릭 켜기 · 드래그 위치';
+    overlayScaleHintNode.style.display='block';
+    placeOverlayFloatingElement(overlayScaleHintNode,container,target,overlayInteractionPointer.x,overlayInteractionPointer.y,true);
+  }else if(overlayScaleHintNode)overlayScaleHintNode.style.display='none';
+  container?.classList.toggle('overlay-modifier-active',shiftActive||ctrlMode);
+  if(shiftActive&&overlayOptionPaletteNode&&container){
+    if(overlayOptionPaletteNode.style.display!=='block'){
+      syncOverlayOptionPalette(); overlayOptionPaletteNode.style.display='block';
+      placeOverlayFloatingElement(overlayOptionPaletteNode,container,target,overlayInteractionPointer.x,overlayInteractionPointer.y,!!target);
     }
-  } else if (overlayScaleHintNode) {
-    overlayScaleHintNode.style.display = 'none';
-  }
-
-  if (shiftActive && overlayOptionPaletteNode && container) {
-    if (overlayOptionPaletteNode.style.display !== 'block') {
-      syncOverlayOptionPalette();
-      overlayOptionPaletteNode.style.display = 'block';
-      placeOverlayFloatingElement(overlayOptionPaletteNode, container, target,
-        overlayInteractionPointer.x, overlayInteractionPointer.y, !!target);
-    }
-  } else if (overlayOptionPaletteNode) {
-    overlayOptionPaletteNode.style.display = 'none';
-  }
+  }else if(overlayOptionPaletteNode)overlayOptionPaletteNode.style.display='none';
 }
-
-
 function installOverlayShiftInteraction() {
   const container = document.getElementById('videoContainer');
   if (!container || container.dataset.overlayShiftReady === '1') return;
@@ -10742,7 +10768,54 @@ function installOverlayShiftInteraction() {
   };
   ensureOverlayModifierControls(container, queueScaleSave);
 
-  let modifierPointerFrame = 0;
+  let ctrlOverlayGesture=null;
+  const finishCtrlOverlayGesture=(event,activate)=>{
+    const gesture=ctrlOverlayGesture;
+    if(!gesture||(event&&event.pointerId!==gesture.pointerId))return;
+    ctrlOverlayGesture=null;
+    if(event?.cancelable)event.preventDefault();
+    event?.stopImmediatePropagation();
+    try{if(container.hasPointerCapture(gesture.pointerId))container.releasePointerCapture(gesture.pointerId);}catch(_){}
+    if(activate&&!gesture.moved)toggleOverlayForKey(gesture.key);
+    if(gesture.moved)queueScaleSave(true);
+    updateOverlayShiftTarget(gesture.lastX,gesture.lastY);
+  };
+  container.addEventListener('pointerdown',event=>{
+    if(event.button!==0||event.pointerType==='touch'||overlayOptionPaletteNode?.contains(event.target)||event.target?.closest?.('#videoContainerFullscreenButton'))return;
+    if(!(event.ctrlKey||overlayInteractionCtrlHeld)||(event.shiftKey||overlayInteractionShiftHeld)||audioOnlyMode)return;
+    overlayInteractionCtrlHeld=true;
+    updateOverlayShiftTarget(event.clientX,event.clientY);
+    const target=findOverlayTextTargetAt(event.clientX,event.clientY);
+    if(!target)return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    const position=overlayPositionForKey(target.key);
+    ctrlOverlayGesture={pointerId:event.pointerId,key:target.key,startX:event.clientX,startY:event.clientY,lastX:event.clientX,lastY:event.clientY,startPosition:position,moved:false};
+    try{container.setPointerCapture(event.pointerId);}catch(_){}
+  },true);
+  container.addEventListener('pointermove',event=>{
+    const gesture=ctrlOverlayGesture;
+    if(!gesture||event.pointerId!==gesture.pointerId)return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY;
+    if(Math.hypot(dx,dy)>=5)gesture.moved=true;
+    gesture.lastX=event.clientX;gesture.lastY=event.clientY;
+    if(gesture.moved){
+      const rect=container.getBoundingClientRect();
+      if(rect.width>0&&rect.height>0){
+        setOverlayPositionForKey(gesture.key,gesture.startPosition.x+dx/rect.width*100,gesture.startPosition.y+dy/rect.height*100,false);
+        updateOverlayShiftTarget(event.clientX,event.clientY);queueScaleSave(false);
+      }
+    }
+  },true);
+  container.addEventListener('pointerup',event=>finishCtrlOverlayGesture(event,true),true);
+  container.addEventListener('pointercancel',event=>finishCtrlOverlayGesture(event,false),true);
+  container.addEventListener('lostpointercapture',event=>finishCtrlOverlayGesture(event,false));
+  window.addEventListener('blur',()=>finishCtrlOverlayGesture(null,false));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)finishCtrlOverlayGesture(null,false);});
+  container.addEventListener('click',event=>{
+    if(overlayOptionPaletteNode?.contains(event.target)||event.target?.closest?.('#videoContainerFullscreenButton'))return;
+    if(event.ctrlKey||overlayInteractionCtrlHeld){event.preventDefault();event.stopImmediatePropagation();}
+  },true);  let modifierPointerFrame = 0;
   let modifierPointerPending = null;
   container.addEventListener('pointermove', event => {
     if (event.pointerType === 'touch') return;
@@ -10764,6 +10837,7 @@ function installOverlayShiftInteraction() {
     });
   }, { passive:true });
   container.addEventListener('pointerleave', () => {
+    if (ctrlOverlayGesture) return;
     overlayInteractionPointer = null;
     overlayInteractionPointerOverPalette = false;
     modifierPointerPending = null;
@@ -10888,6 +10962,35 @@ function toggleHanziVideoOverlay() {
 // ===== 영상 위 오버레이 크기 (자막/번역/한자) 개별 스케일 =====
 // CSS 변수(--sub-overlay-scale, --trans-overlay-scale, --hanzi-overlay-scale)로 transform: scale() 적용
 let subOverlayScale = 1.0, transOverlayScale = 1.0, hanziOverlayScale = 1.0;
+const DEFAULT_OVERLAY_POSITIONS = { subtitle:{x:50,y:84}, translation:{x:50,y:50}, hanzi:{x:50,y:15} };
+let overlayPositions = { subtitle:{x:50,y:84}, translation:{x:50,y:50}, hanzi:{x:50,y:15} };
+function overlayPositionForKey(key) {
+  const fallback = DEFAULT_OVERLAY_POSITIONS[key] || {x:50,y:50};
+  const value = overlayPositions[key] || fallback;
+  return {x:value.x,y:value.y};
+}
+function setOverlayPositionForKey(key,x,y,persist=false) {
+  if (!DEFAULT_OVERLAY_POSITIONS[key]) return false;
+  const current = overlayPositionForKey(key), nx=Number(x), ny=Number(y);
+  overlayPositions[key] = {x:Number.isFinite(nx)?Math.max(2,Math.min(98,nx)):current.x,y:Number.isFinite(ny)?Math.max(2,Math.min(98,ny)):current.y};
+  const suffix=key==='subtitle'?'sub':key==='translation'?'trans':'hanzi';
+  document.documentElement.style.setProperty('--'+suffix+'-overlay-x',overlayPositions[key].x+'%');
+  document.documentElement.style.setProperty('--'+suffix+'-overlay-y',overlayPositions[key].y+'%');
+  syncOverlayOptionPalette();
+  if (persist) { try { saveSettings(); } catch (_) {} }
+  return true;
+}
+function getOverlayPositionSnapshot() {
+  return {subtitle:overlayPositionForKey('subtitle'),translation:overlayPositionForKey('translation'),hanzi:overlayPositionForKey('hanzi')};
+}
+function applyOverlayPositionSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return;
+  for (const key of Object.keys(DEFAULT_OVERLAY_POSITIONS)) {
+    const value=snapshot[key];
+    if (value && typeof value==='object') setOverlayPositionForKey(key,value.x,value.y,false);
+  }
+}
+for (const key of Object.keys(DEFAULT_OVERLAY_POSITIONS)) setOverlayPositionForKey(key,overlayPositions[key].x,overlayPositions[key].y,false);
 function normalizeOverlayScale(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
@@ -10925,29 +11028,11 @@ function setHanziOverlayScaleFromSlider(value, persist = true) {
 let subOverlayMode = false;
 function toggleSubOverlay() {
   subOverlayMode = !subOverlayMode;
-  const overlay = document.getElementById('overlay');
-  const videoContainer = document.getElementById('videoContainer');
-  const subtitleDisplay = document.getElementById('subtitleDisplay');
-  if (subOverlayMode) {
-    // overlay를 videoContainer 안으로 이동
-    videoContainer.appendChild(overlay);
-    overlay.classList.add('on-video');
-    subtitleDisplay.style.display = 'none';
-    document.getElementById('resizeTimelineDisplay').style.display = 'none';
-  } else {
-    // overlay를 subtitleDisplay 안으로 복원
-    subtitleDisplay.appendChild(overlay);
-    overlay.classList.remove('on-video');
-    subtitleDisplay.style.display = '';
-    document.getElementById('resizeTimelineDisplay').style.display = '';
-  }
-  updateOverlayShiftTarget();
-  syncOverlayOptionPalette();
-  updateTopFloatUI();
-  updateBottomFloatUI();
-  try { saveSettings(); } catch(_) {}
+  document.getElementById('subtitleVideoOverlay')?.classList.toggle('active',subOverlayMode);
+  updateOverlayShiftTarget(); syncOverlayOptionPalette();
+  updateTopFloatUI(); updateBottomFloatUI();
+  try { saveSettings(); } catch (_) {}
 }
-
 function installVideoTouchGestures() {
   const container = document.getElementById('videoContainer');
   const videoElement = container?.querySelector('video');
@@ -11091,6 +11176,7 @@ function captureLayout() {
     dictVis:     charDictVisible,
     sideVis:     sidePanelVisible,
     subOverlay:  subOverlayMode,
+    overlayPositions: getOverlayPositionSnapshot(),
   };
 }
 
@@ -11120,6 +11206,7 @@ function loadLayout(slot) {
   if (L.dictVis !== charDictVisible) toggleCharDictPanel();
   if (L.sideVis !== sidePanelVisible) toggleSidePanel();
   if (L.subOverlay !== subOverlayMode) toggleSubOverlay();
+  if (L.overlayPositions) applyOverlayPositionSnapshot(L.overlayPositions);
   showTimeDisplay(`📐 레이아웃 적용`);
   updateTopFloatUI(); updateBottomFloatUI();
 }
