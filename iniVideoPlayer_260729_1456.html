@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C479';
+document.documentElement.dataset.vpBuild = 'C480';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -800,8 +800,9 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #hanziVideoOverlay.ctrl-overlay-hidden-target { display:flex !important; }
 #subtitleVideoOverlay.ctrl-overlay-hidden-target .overlay-subtitle-content,#transVideoOverlay.ctrl-overlay-hidden-target > :not(.overlay-inline-controls),#hanziVideoOverlay.ctrl-overlay-hidden-target > :not(.overlay-inline-controls) { display:none !important; visibility:hidden !important; }
 #subtitleVideoOverlay.ctrl-overlay-hidden-target::after,#transVideoOverlay.ctrl-overlay-hidden-target::after,#hanziVideoOverlay.ctrl-overlay-hidden-target::after { content:attr(data-overlay-hidden-label); position:absolute; inset:38px 8px 5px; z-index:2; display:grid; place-items:center; padding:4px 8px; color:#dedee2; font:700 12px/1.25 system-ui,sans-serif; text-align:center; text-shadow:0 1px 3px #000; pointer-events:none; }
-.overlay-inline-controls { position:absolute; z-index:1003; top:0; left:0; display:none; align-items:center; flex-wrap:wrap; gap:4px; width:max-content; max-width:380px; min-width:0; min-height:30px; padding:4px 5px; box-sizing:border-box; border:1px solid rgba(145,145,152,.78); border-radius:5px; background:rgba(26,26,29,.98); color:#e1e1e4; font:600 11px/1.2 system-ui,sans-serif; white-space:normal; pointer-events:auto; box-shadow:0 2px 8px rgba(0,0,0,.58); transform:scale(var(--overlay-control-inverse-scale,1)); transform-origin:top left; }
-#subtitleVideoOverlay.ctrl-overlay-target > .overlay-inline-controls,#transVideoOverlay.ctrl-overlay-target > .overlay-inline-controls,#hanziVideoOverlay.ctrl-overlay-target > .overlay-inline-controls { display:flex; }
+/* Keep modifier controls on the video frame, outside scaled text layers. */
+.overlay-inline-controls { position:absolute; z-index:1003; top:0; left:0; display:none; align-items:center; flex-wrap:wrap; gap:4px; width:max-content; max-width:380px; min-width:0; min-height:30px; padding:4px 5px; box-sizing:border-box; border:1px solid rgba(145,145,152,.78); border-radius:5px; background:rgba(26,26,29,.98); color:#e1e1e4; font:600 11px/1.2 system-ui,sans-serif; white-space:normal; pointer-events:auto; box-shadow:0 2px 8px rgba(0,0,0,.58); }
+.overlay-inline-controls.ctrl-overlay-target { display:flex; }
 .overlay-inline-controls .overlay-inline-name { padding:0 3px; color:#c9c9ce; flex:0 0 auto; }
 .overlay-inline-controls button { min-width:27px; min-height:25px; padding:2px 5px; border:1px solid #57575f; border-radius:4px; background:#303035; color:#dedee2; font:700 10px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
 .overlay-inline-controls button:hover { background:#414147; }
@@ -11275,8 +11276,8 @@ function setOverlayAlignmentForKey(key, value, persist = true) {
     const prefix = key === 'subtitle' ? 'sub' : key === 'translation' ? 'trans' : 'hanzi';
     root.style.setProperty('--' + prefix + '-overlay-align', alignment);
     if (key === 'hanzi') root.style.setProperty('--hanzi-overlay-justify', alignment === 'left' ? 'flex-start' : alignment === 'right' ? 'flex-end' : 'center');
-    if (root.querySelector('.overlay-inline-controls')) syncOverlayInlineControls();
   }
+  syncOverlayInlineControls();
   clampOverlayPositionForKey(key,false);
   document.querySelectorAll('[data-overlay-panel-align]').forEach(button => {
     const [buttonKey, buttonAlignment] = button.dataset.overlayPanelAlign.split(':');
@@ -11295,9 +11296,12 @@ function applyOverlayAlignmentSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return;
   for (const key of Object.keys(DEFAULT_OVERLAY_ALIGNMENTS)) if (typeof snapshot[key] === 'string') setOverlayAlignmentForKey(key, snapshot[key], false);
 }
+function overlayInlineControlsForKey(key) {
+  return document.getElementById('videoContainer')?.querySelector('.overlay-inline-controls[data-overlay-option-key="' + key + '"]') || null;
+}
 function syncOverlayInlineControls() {
   for (const layer of overlayLayerConfigs()) {
-    const toolbar = layer.element?.querySelector('.overlay-inline-controls');
+    const toolbar = overlayInlineControlsForKey(layer.key);
     if (!toolbar) continue;
     const toggle = toolbar.querySelector('.overlay-inline-toggle');
     if (toggle) {
@@ -11314,7 +11318,7 @@ function ensureOverlayModifierControls(container) {
   for (const option of options) {
     const id = option.key === 'subtitle' ? 'subtitleVideoOverlay' : option.key === 'translation' ? 'transVideoOverlay' : 'hanziVideoOverlay';
     const root = document.getElementById(id);
-    if (!root || root.querySelector('.overlay-inline-controls')) continue;
+    if (!root || container.querySelector('.overlay-inline-controls[data-overlay-option-key="' + option.key + '"]')) continue;
     const toolbar = document.createElement('div');
     toolbar.className = 'overlay-inline-controls';
     toolbar.dataset.overlayOptionKey = option.key;
@@ -11348,7 +11352,7 @@ function ensureOverlayModifierControls(container) {
       alignGroup.appendChild(button);
     }
     toolbar.append(name, toggle, alignGroup);
-    root.appendChild(toolbar);
+    container.appendChild(toolbar);
   }
   syncOverlayInlineControls();
   for(const layer of overlayLayerConfigs())if(layer.enabled)clampOverlayPositionForKey(layer.key,false);
@@ -11360,29 +11364,29 @@ function overlayControlTargetForKey(key) {
   return {...layer,rect:layer.element.getBoundingClientRect(),hitKind:'toolbar',z:Number.isFinite(z)?z:0};
 }
 function positionOverlayInlineControls(layer, container) {
-  const root=layer?.element,toolbar=root?.querySelector('.overlay-inline-controls');
+  const root=layer?.element,toolbar=overlayInlineControlsForKey(layer?.key);
   if(!root||!toolbar||!container)return;
   const frame=container.getBoundingClientRect(),rootRect=root.getBoundingClientRect();
-  if(frame.width<=0||frame.height<=0||rootRect.width<=0||rootRect.height<=0)return;
-  const inset=Math.min(8,Math.max(3,Math.min(frame.width,frame.height)*0.02));
-  const availableWidth=Math.max(1,frame.width-inset*2);
+  const frameLeft=frame.left+container.clientLeft,frameTop=frame.top+container.clientTop;
+  const frameWidth=container.clientWidth,frameHeight=container.clientHeight;
+  if(frameWidth<=0||frameHeight<=0||rootRect.width<=0||rootRect.height<=0)return;
+  const inset=Math.min(8,Math.max(3,Math.min(frameWidth,frameHeight)*0.02));
+  const availableWidth=Math.max(1,frameWidth-inset*2);
   toolbar.style.maxWidth=Math.min(380,availableWidth)+'px';
-  toolbar.style.maxHeight=Math.max(1,frame.height-inset*2)+'px';
+  toolbar.style.maxHeight=Math.max(1,frameHeight-inset*2)+'px';
   toolbar.style.overflow='auto';
   toolbar.style.left='0px';
   toolbar.style.top='0px';
   const toolbarRect=toolbar.getBoundingClientRect();
-  const minX=frame.left+inset,maxX=Math.max(minX,frame.right-inset-toolbarRect.width);
-  const minY=frame.top+inset,maxY=Math.max(minY,frame.bottom-inset-toolbarRect.height);
+  const minX=frameLeft+inset,maxX=Math.max(minX,frameLeft+frameWidth-inset-toolbarRect.width);
+  const minY=frameTop+inset,maxY=Math.max(minY,frameTop+frameHeight-inset-toolbarRect.height);
   const viewportX=Math.max(minX,Math.min(rootRect.left,maxX));
   const above=rootRect.top-toolbarRect.height-inset;
   const below=rootRect.bottom+inset;
   let viewportY=above>=minY?above:below;
   viewportY=Math.max(minY,Math.min(viewportY,maxY));
-  const scaleX=root.offsetWidth>0?rootRect.width/root.offsetWidth:1;
-  const scaleY=root.offsetHeight>0?rootRect.height/root.offsetHeight:scaleX;
-  toolbar.style.left=((viewportX-rootRect.left)/(scaleX||1))+'px';
-  toolbar.style.top=((viewportY-rootRect.top)/(scaleY||1))+'px';
+  toolbar.style.left=(viewportX-frameLeft)+'px';
+  toolbar.style.top=(viewportY-frameTop)+'px';
 }
 function clampOverlayPositionForKey(key, persist=false) {
   const container=document.getElementById('videoContainer');
@@ -11425,6 +11429,7 @@ function updateOverlayCtrlTarget(x,y) {
   for(const layer of layers){
     if(!layer.element)continue;
     layer.element.classList.remove(overlayCtrlTargetClass,'ctrl-overlay-hidden-target');
+    overlayInlineControlsForKey(layer.key)?.classList.remove(overlayCtrlTargetClass);
     layer.element.removeAttribute('data-overlay-hidden-label');
     if(ctrlMode&&!layer.enabled){
       layer.element.classList.add('ctrl-overlay-hidden-target');
@@ -11434,7 +11439,11 @@ function updateOverlayCtrlTarget(x,y) {
   const target=ctrlMode&&overlayInteractionToolbarKey
     ?overlayControlTargetForKey(overlayInteractionToolbarKey)
     :(ctrlMode&&hasPointer?findOverlayTextTargetAt(overlayInteractionPointer.x,overlayInteractionPointer.y):null);
-  if(target?.element){target.element.classList.add(overlayCtrlTargetClass);clampOverlayPositionForKey(target.key,false);}
+  if(target?.element){
+    target.element.classList.add(overlayCtrlTargetClass);
+    overlayInlineControlsForKey(target.key)?.classList.add(overlayCtrlTargetClass);
+    clampOverlayPositionForKey(target.key,false);
+  }
   syncOverlayInlineControls();
   if(target?.element)positionOverlayInlineControls(target,container);
   container?.classList.toggle('overlay-modifier-active',ctrlMode);
@@ -11666,8 +11675,7 @@ function setOverlayPositionForKey(key,x,y,persist=false) {
   const suffix=key==='subtitle'?'sub':key==='translation'?'trans':'hanzi';
   document.documentElement.style.setProperty('--'+suffix+'-overlay-x',overlayPositions[key].x+'%');
   document.documentElement.style.setProperty('--'+suffix+'-overlay-y',overlayPositions[key].y+'%');
-  const rootId = key === 'subtitle' ? 'subtitleVideoOverlay' : key === 'translation' ? 'transVideoOverlay' : 'hanziVideoOverlay';
-  if (document.getElementById(rootId)?.querySelector('.overlay-inline-controls')) syncOverlayInlineControls();
+
   syncOverlayPositionControlsForKey(key);
   clampOverlayPositionForKey(key,false);
   if (persist) { try { saveSettings(); } catch (_) {} }
@@ -11705,7 +11713,6 @@ function syncOverlayScaleControl(value, cssVariable, sliderId, outputId) {
   const scaleKey = cssVariable === '--sub-overlay-scale' ? 'subtitle' : cssVariable === '--trans-overlay-scale' ? 'translation' : 'hanzi';
   const scaleRoot = document.getElementById(scaleKey === 'subtitle' ? 'subtitleVideoOverlay' : scaleKey === 'translation' ? 'transVideoOverlay' : 'hanziVideoOverlay');
   if (scaleRoot) {
-    scaleRoot.style.setProperty('--overlay-control-inverse-scale', String(1 / value));
     /* 확대해도 표시 폭은 영상 안에 유지하고, 더 큰 글자는 안에서 줄바꿈한다. */
     scaleRoot.style.width = ((scaleKey === 'hanzi' ? 96 : 90) / value) + '%';
     clampOverlayPositionForKey(scaleKey,false);
