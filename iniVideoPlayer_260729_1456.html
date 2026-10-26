@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C475';
+document.documentElement.dataset.vpBuild = 'C464';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1131,7 +1131,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   }
 }
 </style>
-<script src="tts-china-client.js?build=C475" defer></script>
+<script src="tts-china-client.js?build=C464" defer></script>
 </head>
 <body style="cursor: default;">
 
@@ -11274,7 +11274,6 @@ function setOverlayAlignmentForKey(key, value, persist = true) {
     if (key === 'hanzi') root.style.setProperty('--hanzi-overlay-justify', alignment === 'left' ? 'flex-start' : alignment === 'right' ? 'flex-end' : 'center');
     if (root.querySelector('.overlay-inline-controls')) syncOverlayInlineControls();
   }
-  clampOverlayPositionForKey(key,false);
   document.querySelectorAll('[data-overlay-panel-align]').forEach(button => {
     const [buttonKey, buttonAlignment] = button.dataset.overlayPanelAlign.split(':');
     if (buttonKey !== key) return;
@@ -11348,7 +11347,6 @@ function ensureOverlayModifierControls(container) {
     root.appendChild(toolbar);
   }
   syncOverlayInlineControls();
-  for(const layer of overlayLayerConfigs())if(layer.enabled)clampOverlayPositionForKey(layer.key,false);
 }
 function overlayControlTargetForKey(key) {
   const layer = overlayLayerConfigs().find(item => item.key === key);
@@ -11381,44 +11379,12 @@ function positionOverlayInlineControls(layer, container) {
   toolbar.style.left=((viewportX-rootRect.left)/(scaleX||1))+'px';
   toolbar.style.top=((viewportY-rootRect.top)/(scaleY||1))+'px';
 }
-function clampOverlayPositionForKey(key, persist=false) {
-  const container=document.getElementById('videoContainer');
-  const layer=overlayLayerConfigs().find(item=>item.key===key);
-  const root=layer?.element;
-  if(!container||!root)return false;
-  const style=getComputedStyle(root);
-  if(style.display==='none'||style.visibility==='hidden')return false;
-  const frame=container.getBoundingClientRect(),rect=root.getBoundingClientRect();
-  if(frame.width<=0||frame.height<=0||rect.width<=0||rect.height<=0)return false;
-  const inset=Math.min(8,Math.max(3,Math.min(frame.width,frame.height)*0.02));
-  const availableWidth=Math.max(1,frame.width-inset*2),availableHeight=Math.max(1,frame.height-inset*2);
-  const minLeft=frame.left+inset,maxLeft=frame.right-inset-rect.width;
-  const minTop=frame.top+inset,maxTop=frame.bottom-inset-rect.height;
-  const left=rect.width<=availableWidth?Math.max(minLeft,Math.min(rect.left,maxLeft)):frame.left+(frame.width-rect.width)/2;
-  const top=rect.height<=availableHeight?Math.max(minTop,Math.min(rect.top,maxTop)):frame.top+(frame.height-rect.height)/2;
-  const dx=left-rect.left,dy=top-rect.top;
-  if(Math.abs(dx)<0.5&&Math.abs(dy)<0.5){
-    if(root.classList.contains(overlayCtrlTargetClass)||root.classList.contains('ctrl-overlay-hidden-target'))positionOverlayInlineControls(layer,container);
-    return false;
-  }
-  const current=overlayPositionForKey(key),width=container.clientWidth||frame.width,height=container.clientHeight||frame.height;
-  const next={x:Math.max(2,Math.min(98,current.x+dx/width*100)),y:Math.max(2,Math.min(98,current.y+dy/height*100))};
-  overlayPositions[key]=next;
-  const suffix=key==='subtitle'?'sub':key==='translation'?'trans':'hanzi';
-  document.documentElement.style.setProperty('--'+suffix+'-overlay-x',next.x+'%');
-  document.documentElement.style.setProperty('--'+suffix+'-overlay-y',next.y+'%');
-  syncOverlayPositionControlsForKey(key);
-  if(persist){try{saveSettings();}catch(_){}}
-  if(root.classList.contains(overlayCtrlTargetClass)||root.classList.contains('ctrl-overlay-hidden-target'))positionOverlayInlineControls(layer,container);
-  return true;
-}
 function updateOverlayCtrlTarget(x,y) {
   if(Number.isFinite(x)&&Number.isFinite(y))overlayInteractionPointer={x,y};
   const container=document.getElementById('videoContainer');
   const hasPointer=!!(overlayInteractionPointer&&container);
   const ctrlMode=overlayInteractionCtrlHeld&&!playerControlsShiftHeld&&hasPointer&&!audioOnlyMode;
   const layers=overlayLayerConfigs();
-  for(const layer of layers)if(layer.enabled)clampOverlayPositionForKey(layer.key,false);
   for(const layer of layers){
     if(!layer.element)continue;
     layer.element.classList.remove(overlayCtrlTargetClass,'ctrl-overlay-hidden-target');
@@ -11431,7 +11397,7 @@ function updateOverlayCtrlTarget(x,y) {
   const target=ctrlMode&&overlayInteractionToolbarKey
     ?overlayControlTargetForKey(overlayInteractionToolbarKey)
     :(ctrlMode&&hasPointer?findOverlayTextTargetAt(overlayInteractionPointer.x,overlayInteractionPointer.y):null);
-  if(target?.element){target.element.classList.add(overlayCtrlTargetClass);clampOverlayPositionForKey(target.key,false);}
+  if(target?.element)target.element.classList.add(overlayCtrlTargetClass);
   syncOverlayInlineControls();
   if(target?.element)positionOverlayInlineControls(target,container);
   container?.classList.toggle('overlay-modifier-active',ctrlMode);
@@ -11442,17 +11408,11 @@ function installPlayerModifierInteraction() {
   container.dataset.playerModifierReady = '1';
   if(typeof ResizeObserver==='function'){
     const overlayToolbarResizeObserver=new ResizeObserver(()=>{
-      requestAnimationFrame(()=>{
-        for(const layer of overlayLayerConfigs())if(layer.enabled)clampOverlayPositionForKey(layer.key,false);
-        if(overlayInteractionCtrlHeld&&!playerControlsShiftHeld&&overlayInteractionPointer&&!audioOnlyMode)updateOverlayCtrlTarget();
-      });
+      if(overlayInteractionCtrlHeld&&!playerControlsShiftHeld&&overlayInteractionPointer&&!audioOnlyMode)updateOverlayCtrlTarget();
     });
     overlayToolbarResizeObserver.observe(container);
-    for(const layer of overlayLayerConfigs())if(layer.element)overlayToolbarResizeObserver.observe(layer.element);
     container._overlayToolbarResizeObserver=overlayToolbarResizeObserver;
   }
-  window.addEventListener('resize',()=>requestAnimationFrame(()=>{for(const layer of overlayLayerConfigs())if(layer.enabled)clampOverlayPositionForKey(layer.key,false);}));
-  document.addEventListener('fullscreenchange',()=>requestAnimationFrame(()=>{for(const layer of overlayLayerConfigs())if(layer.enabled)clampOverlayPositionForKey(layer.key,false);}));
 
   const overlayScaleWheelRemainders = Object.create(null);
   let overlayScaleSaveTimer = null;
@@ -11614,7 +11574,6 @@ let hanziVideoOverlayEnabled = false;
 function toggleTransVideoOverlay() {
   transVideoOverlayEnabled = !transVideoOverlayEnabled;
   document.getElementById('transVideoOverlay').classList.toggle('active', transVideoOverlayEnabled);
-  if(transVideoOverlayEnabled)clampOverlayPositionForKey('translation',false);
   updateOverlayCtrlTarget();
   syncOverlayInlineControls();
   updateTopFloatUI(); updateBottomFloatUI();
@@ -11624,7 +11583,6 @@ function toggleTransVideoOverlay() {
 function toggleHanziVideoOverlay() {
   hanziVideoOverlayEnabled = !hanziVideoOverlayEnabled;
   document.getElementById('hanziVideoOverlay').classList.toggle('active', hanziVideoOverlayEnabled);
-  if(hanziVideoOverlayEnabled)clampOverlayPositionForKey('hanzi',false);
   updateOverlayCtrlTarget();
   syncOverlayInlineControls();
   updateTopFloatUI(); updateBottomFloatUI();
@@ -11666,7 +11624,6 @@ function setOverlayPositionForKey(key,x,y,persist=false) {
   const rootId = key === 'subtitle' ? 'subtitleVideoOverlay' : key === 'translation' ? 'transVideoOverlay' : 'hanziVideoOverlay';
   if (document.getElementById(rootId)?.querySelector('.overlay-inline-controls')) syncOverlayInlineControls();
   syncOverlayPositionControlsForKey(key);
-  clampOverlayPositionForKey(key,false);
   if (persist) { try { saveSettings(); } catch (_) {} }
   return true;
 }
@@ -11701,12 +11658,7 @@ function syncOverlayScaleControl(value, cssVariable, sliderId, outputId) {
   document.documentElement.style.setProperty(cssVariable, String(value));
   const scaleKey = cssVariable === '--sub-overlay-scale' ? 'subtitle' : cssVariable === '--trans-overlay-scale' ? 'translation' : 'hanzi';
   const scaleRoot = document.getElementById(scaleKey === 'subtitle' ? 'subtitleVideoOverlay' : scaleKey === 'translation' ? 'transVideoOverlay' : 'hanziVideoOverlay');
-  if (scaleRoot) {
-    scaleRoot.style.setProperty('--overlay-control-inverse-scale', String(1 / value));
-    /* 확대해도 표시 폭은 영상 안에 유지하고, 더 큰 글자는 안에서 줄바꿈한다. */
-    scaleRoot.style.width = ((scaleKey === 'hanzi' ? 96 : 90) / value) + '%';
-    clampOverlayPositionForKey(scaleKey,false);
-  }
+  if (scaleRoot) scaleRoot.style.setProperty('--overlay-control-inverse-scale', String(1 / value));
   const slider = document.getElementById(sliderId);
   if (slider) slider.value = String(value);
   const output = document.getElementById(outputId);
@@ -11738,7 +11690,6 @@ let subOverlayMode = false;
 function toggleSubOverlay() {
   subOverlayMode = !subOverlayMode;
   document.getElementById('subtitleVideoOverlay')?.classList.toggle('active',subOverlayMode);
-  if(subOverlayMode)clampOverlayPositionForKey('subtitle',false);
   updateOverlayCtrlTarget(); syncOverlayInlineControls();
   updateTopFloatUI(); updateBottomFloatUI();
   try { saveSettings(); } catch (_) {}
