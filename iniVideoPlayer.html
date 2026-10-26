@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C477';
+document.documentElement.dataset.vpBuild = 'C479';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -2110,6 +2110,9 @@ function renderShortcutPanel() {
   content.innerHTML = html;
 }
 
+// Picker start location is read by early UI callbacks; initialize it with the player state.
+let playlistLastPickerHandle = null;
+let playlistLastPickerRevision = 0;
 let playlist = [];
 let currentIndex = 0;
 let subtitles = [];
@@ -12782,8 +12785,6 @@ async function openFilePickerFSA() {
 }
 
 // IDB meta 스토어에 마지막 파일 핸들 저장 — 다음 파일선택의 startIn 으로 사용
-let playlistLastPickerHandle = null;
-let playlistLastPickerRevision = 0;
 async function _saveLastFilePickerHandle(handle) {
   if (!handle) return;
   playlistLastPickerHandle = handle; playlistLastPickerRevision++;
