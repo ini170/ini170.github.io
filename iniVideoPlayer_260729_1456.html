@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- saved from url=(0052)file:///F:/Script_Video%20Player/iniVideoPlayer.html -->
 <html lang="ko"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C483';
+document.documentElement.dataset.vpBuild = 'C493';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -488,6 +488,8 @@ textarea {
 }
 #playlistPermissionGate.show { display:flex; }
 html.vp-hosted #playlistPermissionGate { display:none !important; }
+html.vp-hosted #playlistFileImportButton,
+html.vp-hosted #playlistFolderImportButton { display:none !important; }
 #playlistPermissionGate .permission-card {
   width:min(460px, 92%);
   padding:18px 20px;
@@ -1132,7 +1134,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
   }
 }
 </style>
-<script src="tts-china-client.js?build=C477" defer></script>
+<script src="tts-china-client.js?build=C493" defer></script>
 </head>
 <body style="cursor: default;">
 
@@ -2891,6 +2893,7 @@ function _playlistHoverTargetIndex() {
 }
 
 let _lastPostedPlaylistSelectionCount = -1;
+let _lastPostedPlaylistLength = -1;
 let _lastPostedPlaylistLocationIndex = -2;
 let _lastPostedPlaylistLocationShortcut = '';
 let _lastPostedPlayerCopyContextActive = null;
@@ -2905,17 +2908,20 @@ function _postPlaylistSelectionState() {
     shift:shortcut.shift === true, alt:shortcut.alt === true
   };
   const locationShortcutKey = JSON.stringify(locationShortcut);
+  const playlistLength = playlist.length;
   const copyContextActive = count > 0 || _playlistHoverTargetIndex() >= 0 || !!_panelHoverCopyPayload();
   if (count === _lastPostedPlaylistSelectionCount &&
+      playlistLength === _lastPostedPlaylistLength &&
       selectedIndex === _lastPostedPlaylistLocationIndex &&
       locationShortcutKey === _lastPostedPlaylistLocationShortcut &&
       copyContextActive === _lastPostedPlayerCopyContextActive) return false;
   _lastPostedPlaylistSelectionCount = count;
+  _lastPostedPlaylistLength = playlistLength;
   _lastPostedPlaylistLocationIndex = selectedIndex;
   _lastPostedPlaylistLocationShortcut = locationShortcutKey;
   _lastPostedPlayerCopyContextActive = copyContextActive;
   try {
-    window.parent.postMessage({ llt:'vp-playlist-selection-state', count, selectedIndex, locationShortcut, copyContextActive }, '*');
+    window.parent.postMessage({ llt:'vp-playlist-selection-state', count, playlistLength, selectedIndex, locationShortcut, copyContextActive }, '*');
     return true;
   } catch (_) {
     return false;
@@ -11650,6 +11656,9 @@ function installPlayerModifierInteraction() {
 
 let transVideoOverlayEnabled = false;
 let hanziVideoOverlayEnabled = false;
+// Overlay position initialization calls the layer helpers immediately below.
+// Keep the subtitle flag initialized before those helpers can inspect it.
+let subOverlayMode = false;
 
 function toggleTransVideoOverlay() {
   transVideoOverlayEnabled = !transVideoOverlayEnabled;
@@ -11772,7 +11781,6 @@ function setHanziOverlayScaleFromSlider(value, persist = true) {
   if (persist) { try { saveSettings(); } catch (_) {} }
 }
 // ===== 영상 위 자막 오버레이 =====
-let subOverlayMode = false;
 function toggleSubOverlay() {
   subOverlayMode = !subOverlayMode;
   document.getElementById('subtitleVideoOverlay')?.classList.toggle('active',subOverlayMode);
@@ -12068,8 +12076,19 @@ const _IDB_VER  = 1;
 let   _idb      = null;
 
 function _openIDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(_IDB_NAME, _IDB_VER);
+  return new Promise(resolve => {
+    let settled = false, timeout = 0, req = null;
+    const finish = (db, reason = null) => {
+      if (settled) { try { db?.close(); } catch(_) {} return; }
+      settled = true;
+      clearTimeout(timeout);
+      if (db) _idb = db;
+      if (reason) console.warn('[IDB] 플레이어 저장소 준비를 완료하지 못했습니다. 재생목록 가져오기는 계속 진행합니다.', reason);
+      resolve(db || null);
+    };
+    try { req = indexedDB.open(_IDB_NAME, _IDB_VER); }
+    catch(error) { finish(null, error); return; }
+    timeout = setTimeout(() => finish(null, new DOMException("IndexedDB 응답 시간 초과", "TimeoutError")), 5000);
     req.onupgradeneeded = e => {
       const d = e.target.result;
       if (!d.objectStoreNames.contains('playlist'))
@@ -12077,8 +12096,9 @@ function _openIDB() {
       if (!d.objectStoreNames.contains('meta'))
         d.createObjectStore('meta', { keyPath: 'key' });
     };
-    req.onsuccess = e => { _idb = e.target.result; resolve(_idb); };
-    req.onerror   = e => { console.warn('[IDB] 열기 실패', e); resolve(null); };
+    req.onblocked = () => finish(null, new DOMException("다른 탭이 IndexedDB 연결을 막고 있습니다", "InvalidStateError"));
+    req.onsuccess = e => finish(e.target.result);
+    req.onerror = () => finish(null, req.error || new DOMException('IndexedDB를 열지 못했습니다', 'UnknownError'));
   });
 }
 
@@ -12305,11 +12325,7 @@ video.addEventListener('pause', () => { schedulePlaylistSave(); });
 
 // 복원
 async function _restorePlaylistFromDB() {
-  if (!_idb) {
-    console.warn('[IDB] 복원 스킵 — IndexedDB 미초기화');
-    _playlistRestoreComplete = true;
-    return;
-  }
+  if (!_idb) console.warn('[IDB] 플레이어 DB를 사용할 수 없어 로컬 manifest와 부모 portable 재생목록으로 복구합니다.');
   try {
     const storedItems = await new Promise((res, rej) => {
       const tx  = _idb.transaction('playlist', 'readonly');
@@ -12853,7 +12869,11 @@ _openIDB().then(async db => {
   }
   // 설정을 먼저 확정·적용한 뒤 영상 복원을 시작해 기본 재생 초기화가 덮지 않게 한다.
   _completeSettingsBootstrap();
-  if (!db) { _playlistRestoreComplete = true; return false; }
+  if (!db) {
+    try { await _restorePlaylistFromDB(); }
+    catch(error) { console.warn('[Playlist recovery] DB 없이 기존 목록 복구 실패', error); _playlistRestoreComplete = true; }
+    return false;
+  }
   const revision = playlistLastPickerRevision;
   void _getLastFilePickerHandle().then(handle => {
     if (revision === playlistLastPickerRevision) playlistLastPickerHandle = handle;
@@ -12878,6 +12898,9 @@ _openIDB().then(async db => {
   }
   return false;
 }).then(result => {
+  // Empty playlists (and failed IndexedDB opens) do not pass through renderPlaylist().
+  // Still tell the host that bootstrap finished so its file/folder pickers can be used.
+  _postPlaylistSelectionState();
   const resolveBootstrap = _resolvePlaylistBootstrapReady;
   _resolvePlaylistBootstrapReady = null;
   if (resolveBootstrap) resolveBootstrap(result);
@@ -12889,6 +12912,7 @@ _openIDB().then(async db => {
   try { _completeSettingsBootstrap(); } catch(settingsError) {
     console.warn('[Settings] 시작 복구 완료 처리 실패', settingsError);
   }
+  _postPlaylistSelectionState();
   const resolveBootstrap = _resolvePlaylistBootstrapReady;
   _resolvePlaylistBootstrapReady = null;
   if (resolveBootstrap) resolveBootstrap(false);
