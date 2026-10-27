@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C481';
+document.documentElement.dataset.vpBuild = 'C483';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -7345,12 +7345,34 @@ function _writeSettingsSnapshotToParent(snapshot) {
 async function _readSettingsSnapshotFromParent() {
   try {
     if (window.parent !== window &&
+        typeof window.parent.vpPlayerSettingsReadLocal === 'function') {
+      const snapshot = window.parent.vpPlayerSettingsReadLocal();
+      if (snapshot && typeof snapshot === 'object') {
+        // Do not hold player startup behind the host app's media-folder scan.
+        // The app's own IndexedDB/local settings are enough to start; a newer
+        // shared-folder snapshot is applied asynchronously when it becomes ready.
+        try {
+          if (typeof window.parent.vpPlayerSettingsLoadSnapshot === 'function') {
+            Promise.resolve(window.parent.vpPlayerSettingsLoadSnapshot()).then(fresh => {
+              if (fresh && typeof fresh === 'object') _acceptParentSettingsSnapshot(fresh);
+            }).catch(error => console.warn('[Settings] 최신 메인 설정 백그라운드 읽기 실패', error));
+          }
+        } catch (error) {
+          console.warn('[Settings] 최신 메인 설정 백그라운드 요청 실패', error);
+        }
+        return snapshot;
+      }
+    }
+    if (window.parent !== window &&
         typeof window.parent.vpPlayerSettingsLoadSnapshot === 'function') {
-      const snapshot = await window.parent.vpPlayerSettingsLoadSnapshot();
-      if (snapshot && typeof snapshot === 'object') return snapshot;
+      const pending = window.parent.vpPlayerSettingsLoadSnapshot();
+      Promise.resolve(pending).then(snapshot => {
+        if (snapshot && typeof snapshot === 'object') _acceptParentSettingsSnapshot(snapshot);
+      }).catch(error => console.warn('[Settings] 메인 설정 백그라운드 읽기 실패', error));
+      return null;
     }
   } catch (error) {
-    console.warn('[Settings] 메인 저장소 직접 읽기 실패; 메시지 브리지로 재시도', error);
+    console.warn('[Settings] 메인 저장소 직접 읽기 실패; 메시지 브리지로 전환', error);
   }
   if (window.parent === window) return null;
   return new Promise(resolve => {
@@ -12859,6 +12881,17 @@ _openIDB().then(async db => {
   const resolveBootstrap = _resolvePlaylistBootstrapReady;
   _resolvePlaylistBootstrapReady = null;
   if (resolveBootstrap) resolveBootstrap(result);
+}, error => {
+  // Never leave file/folder imports waiting forever if an unexpected startup
+  // error escapes the normal recovery path above.
+  _playlistRestoreComplete = true;
+  console.warn('[IDB] 시작 복구 경로 실패', error);
+  try { _completeSettingsBootstrap(); } catch(settingsError) {
+    console.warn('[Settings] 시작 복구 완료 처리 실패', settingsError);
+  }
+  const resolveBootstrap = _resolvePlaylistBootstrapReady;
+  _resolvePlaylistBootstrapReady = null;
+  if (resolveBootstrap) resolveBootstrap(false);
 });
 /* ===== 저대비(스텔스) 모드 — Ctrl+H 토글 (단어카드와 동일 컨셉) =====
    영상·UI 전체를 흑백+감광(brightness .4) 처리해 흘끗 봐서는 어두운 창으로만 보이게.
