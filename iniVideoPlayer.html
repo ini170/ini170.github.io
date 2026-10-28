@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C494';
+document.documentElement.dataset.vpBuild = 'C495';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -488,8 +488,6 @@ textarea {
 }
 #playlistPermissionGate.show { display:flex; }
 html.vp-hosted #playlistPermissionGate { display:none !important; }
-html.vp-hosted #playlistFileImportButton,
-html.vp-hosted #playlistFolderImportButton { display:none !important; }
 #playlistPermissionGate .permission-card {
   width:min(460px, 92%);
   padding:18px 20px;
