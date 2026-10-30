@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C508';
+document.documentElement.dataset.vpBuild = 'C509';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -6512,7 +6512,7 @@ function _mp3ExportFindCurrentCueIndex(snapshot) {
   return -1;
 }
 
-function _mp3ExportBuildPlan(snapshot, sourceDuration) {
+function _mp3ExportBuildPlan(snapshot, sourceDuration, maxOutputSeconds = MP3_EXPORT_MAX_OUTPUT_SECONDS) {
   const segments = [];
   let outputDuration = 0;
   const append = (startValue, endValue, rateValue) => {
@@ -6614,13 +6614,59 @@ function _mp3ExportBuildPlan(snapshot, sourceDuration) {
   if (!segments.length || outputDuration <= 0) {
     throw new Error('현재 설정에서 MP3로 만들 재생 구간이 없습니다.');
   }
-  if (outputDuration > MP3_EXPORT_MAX_OUTPUT_SECONDS) {
+  if (outputDuration > maxOutputSeconds) {
     throw new Error('예상 MP3 길이가 4시간을 넘습니다. 반복 횟수나 세트 수를 줄여 주세요.');
   }
   if (segments.length > 200000) {
     throw new Error('출력 구간이 너무 많습니다. 반복 횟수나 세트 수를 줄여 주세요.');
   }
   return { segments, duration:outputDuration, description };
+}
+
+function _mp3ExportSplitPlan(plan, maxDuration = MP3_EXPORT_MAX_OUTPUT_SECONDS) {
+  if (!plan || !Array.isArray(plan.segments) || !(maxDuration > 0)) return [];
+  const parts = [];
+  let segments = [];
+  let duration = 0;
+  const finish = () => {
+    if (!segments.length || duration <= 0) return;
+    parts.push({ segments, duration, description:plan.description });
+    segments = [];
+    duration = 0;
+  };
+  for (const segment of plan.segments) {
+    const rate = Math.max(0.1, Math.min(2, Number(segment.rate) || 1));
+    const sourceLength = Math.max(0, Number(segment.sourceEnd) - Number(segment.sourceStart));
+    if (!(sourceLength > 0)) continue;
+    let sourceCursor = Number(segment.sourceStart);
+    let outputRemaining = sourceLength / rate;
+    while (outputRemaining > 0.000001) {
+      let space = maxDuration - duration;
+      if (space <= 0.000001) {
+        finish();
+        space = maxDuration;
+      }
+      const outputLength = Math.min(outputRemaining, space);
+      const sourceEnd = outputLength >= outputRemaining - 0.000001
+        ? Number(segment.sourceEnd)
+        : Math.min(Number(segment.sourceEnd), sourceCursor + outputLength * rate);
+      const actualOutputLength = Math.max(0, (sourceEnd - sourceCursor) / rate);
+      if (!(actualOutputLength > 0)) break;
+      segments.push({
+        sourceStart:sourceCursor,
+        sourceEnd,
+        rate,
+        outputStart:duration,
+        outputEnd:duration + actualOutputLength
+      });
+      duration += actualOutputLength;
+      sourceCursor = sourceEnd;
+      outputRemaining = Math.max(0, Number(segment.sourceEnd) - sourceCursor) / rate;
+      if (duration >= maxDuration - 0.000001) finish();
+    }
+  }
+  finish();
+  return parts;
 }
 
 function _mp3ExportCreatePitchPreservingStream(audioBuffer, segment, targetFrames) {
@@ -7044,20 +7090,24 @@ async function exportPlaylistMp3(event) {
             !snapshot.subtitles.some(cue => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.start >= 0 && cue.end > cue.start)) {
           throw new Error('현재 반복·스킵 설정을 적용할 SRT 자막이 없습니다. 해당 영상의 SRT를 재생목록에 연결해 주세요.');
         }
-        const plan = _mp3ExportBuildPlan(snapshot, audioBuffer.duration);
-        if (partDuration > 0 && partDuration + plan.duration > MP3_EXPORT_MAX_OUTPUT_SECONDS) {
-          finishPart();
-          encoder = new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, settings.bitrate);
-        }
+        const plan = _mp3ExportBuildPlan(snapshot, audioBuffer.duration, Infinity);
         totalDuration += plan.duration;
-        partDuration += plan.duration;
         totalSegments += plan.segments.length;
         if (totalSegments > 200000) throw new Error('전체 출력 구간이 200,000개를 넘습니다. 반복 횟수나 목록을 나눠 주세요.');
-        _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · 0%');
-        const rendered = await _mp3ExportRenderMp3(audioBuffer, plan, settings.bitrate, ratio => {
-          _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · ' + Math.floor(ratio * 100) + '%');
-        }, { encoder, flushEncoder:false });
-        encodedChunks.push(...rendered.chunks);
+        const planParts = _mp3ExportSplitPlan(plan);
+        for (let partIndex = 0; partIndex < planParts.length; partIndex++) {
+          const planPart = planParts[partIndex];
+          if (partDuration > 0 && partDuration + planPart.duration > MP3_EXPORT_MAX_OUTPUT_SECONDS) {
+            finishPart();
+            encoder = new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, settings.bitrate);
+          }
+          partDuration += planPart.duration;
+          _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · 0%');
+          const rendered = await _mp3ExportRenderMp3(audioBuffer, planPart, settings.bitrate, ratio => {
+            _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · ' + Math.floor(ratio * 100) + '%');
+          }, { encoder, flushEncoder:false });
+          encodedChunks.push(...rendered.chunks);
+        }
       } catch (error) {
         throw new Error('재생목록 ' + (index + 1) + '/' + items.length + ' 항목 [' + label + '] 처리 실패: ' + String(error && error.message || error));
       }
