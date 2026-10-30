@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C504';
+document.documentElement.dataset.vpBuild = 'C505';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -6057,18 +6057,36 @@ function _phraseRecorderEnsureLame() {
   });
   return phraseRecorderLamePromise;
 }
+function _phraseRecorderBridgeRequest(action, payload = {}) {
+  if (window.parent === window) return Promise.reject(new Error('메인 앱 연결이 없습니다.'));
+  const requestId = 'vp-phrase-' + action + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const onMessage = event => {
+      if (event.source !== window.parent || event.data?.llt !== 'vp-phrase-recording-result' ||
+          event.data.requestId !== requestId) return;
+      finish(null, event.data.result);
+    };
+    const timer = setTimeout(() => finish(new Error('메인 앱의 구문 녹음 저장 응답이 시간 초과되었습니다. 탭을 새로고침한 뒤 다시 눌러 주세요.')), 600000);
+    window.addEventListener('message', onMessage);
+    try {
+      window.parent.postMessage({ llt:'vp-phrase-recording-' + action, requestId, ...payload }, '*');
+    } catch (error) {
+      finish(new Error('메인 앱에 구문 녹음 요청을 전달하지 못했습니다: ' + String(error && error.message || error)));
+    }
+  });
+}
 function _phraseRecorderChooseDestination() {
   if (window.parent !== window) {
-    let begin;
-    try { begin = window.parent.vpPhraseRecordingBeginFromPlayer; }
-    catch (_) { begin = null; }
-    if (typeof begin !== 'function') {
-      return Promise.reject(new Error('메인 앱의 녹음 폴더 저장 연결을 사용할 수 없습니다.'));
-    }
-    let pending;
-    try { pending = begin.call(window.parent, window); }
-    catch (error) { return Promise.reject(error); }
-    return Promise.resolve(pending).then(result => {
+    return _phraseRecorderBridgeRequest('begin').then(result => {
       if (!result || result.ok !== true || !result.id) {
         throw new Error(result && result.message || '녹음 폴더를 선택하지 못했습니다.');
       }
@@ -6085,11 +6103,9 @@ function _phraseRecorderChooseDestination() {
 }
 function _phraseRecorderWriteFile(session, name, blob, append = false) {
   if (session.destination.kind === 'host') {
-    let write;
-    try { write = window.parent.vpPhraseRecordingWriteFileFromPlayer; }
-    catch (_) { write = null; }
-    if (typeof write !== 'function') return Promise.reject(new Error('메인 앱의 녹음 파일 저장 연결이 끊겼습니다.'));
-    return Promise.resolve(write.call(window.parent, window, session.destination.id, name, blob, append));
+    return _phraseRecorderBridgeRequest('write', {
+      sessionId:session.destination.id, fileName:name, blob, append:append === true
+    });
   }
   return (async () => {
     const handle = await session.destination.directory.getFileHandle(name, { create:true });
@@ -6375,10 +6391,8 @@ async function _phraseRecorderCleanup(session) {
     if (session.audioContext && session.audioContext.state !== 'closed') await session.audioContext.close();
   } catch (_) {}
   if (session.destination && session.destination.kind === 'host') {
-    try {
-      const finish = window.parent.vpPhraseRecordingFinishFromPlayer;
-      if (typeof finish === 'function') await finish.call(window.parent, window, session.destination.id);
-    } catch (error) { console.warn('[Phrase recorder] 부모 저장 세션 종료 실패', error); }
+    try { await _phraseRecorderBridgeRequest('finish', { sessionId:session.destination.id }); }
+    catch (error) { console.warn('[Phrase recorder] 부모 저장 세션 종료 실패', error); }
   }
 }
 const MP3_EXPORT_SAMPLE_RATE = 44100;
@@ -6986,10 +7000,7 @@ async function startPhraseRecording(event) {
       try { await stopPhraseRecording('start-error'); } catch (_) {}
     } else {
       if (destination && destination.kind === 'host') {
-        try {
-          const finish = window.parent.vpPhraseRecordingFinishFromPlayer;
-          if (typeof finish === 'function') await finish.call(window.parent, window, destination.id);
-        } catch (_) {}
+        try { await _phraseRecorderBridgeRequest('finish', { sessionId:destination.id }); } catch (_) {}
       }
       try { if (earlyAudioContext && earlyAudioContext.state !== 'closed') await earlyAudioContext.close(); } catch (_) {}
     }
