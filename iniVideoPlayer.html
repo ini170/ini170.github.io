@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C509';
+document.documentElement.dataset.vpBuild = 'C510';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1439,7 +1439,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
           <a id="mp3ExportDownload" style="display:none;margin-left:7px;color:#9bd4ff;" download>MP3 다운로드</a>
           <button id="mp3PlaylistExportButton" type="button" onclick="exportPlaylistMp3(event)" style="margin-left:6px;background:#182c3c;color:#b9dcf7;border:1px solid #3a607d;border-radius:3px;padding:4px 10px;cursor:pointer;">재생목록 전체 MP3</button>
           <span id="mp3PlaylistExportDownload" style="display:none;margin-left:7px;"></span>
-          <div id="mp3ExportStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.4;">현재 영상 또는 재생목록 전체를 현재 반복 설정대로 MP3 출력합니다. 목록이 4시간을 넘으면 영상 경계에서 파일을 나눕니다. TTS는 제외합니다.</div>
+          <div id="mp3ExportStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.4;">현재 영상 또는 재생목록 전체를 현재 반복 설정대로 MP3 출력합니다. 큰 원본은 메모리 한도를 피하도록 실시간 스트리밍 처리하며, 이 경우 출력 구간 길이만큼 시간이 걸릴 수 있습니다. 목록이 4시간을 넘으면 파일을 나눕니다. TTS는 제외합니다.</div>
         </div>
       </div>
       <!-- 여분 설정 -->
@@ -6941,7 +6941,9 @@ async function _mp3ExportReadSourceBytes(snapshot, kind = 'video') {
       return await fresh.arrayBuffer();
     } catch (secondError) {
       const message = String(secondError && (secondError.message || secondError.name) || secondError || '파일 읽기 실패');
-      throw new Error((isSrt ? '연결된 SRT 파일을 읽지 못했습니다.' : '권한이 연결된 원본 파일도 읽지 못했습니다.') + ' 메인 앱에서 전체 파일 권한을 다시 허용하고 파일을 다시 연결해 주세요. (' + message + ')');
+      throw new Error((isSrt
+        ? '연결된 SRT 파일을 읽지 못했습니다. 파일 연결과 권한을 확인해 주세요.'
+        : 'MP3 디코딩용으로 원본 전체를 메모리에 읽지 못했습니다. 큰 파일은 스트리밍 경로로 전환합니다.') + ' (' + message + ')');
     }
   }
 }
@@ -6962,6 +6964,273 @@ async function _mp3ExportDecodeAudio(snapshot, itemLabel = '현재 영상') {
   }
   if (!audioBuffer || audioBuffer.length <= 0) throw new Error(itemLabel + '에서 오디오 트랙을 찾지 못했습니다.');
   return audioBuffer;
+}
+const MP3_EXPORT_STREAM_FILE_BYTES = 96 * 1024 * 1024;
+const MP3_EXPORT_STREAM_PCM_BYTES = 192 * 1024 * 1024;
+function _mp3ExportShouldStream(file, duration = 0) {
+  const fileBytes = Number(file && file.size) || 0;
+  const pcmBytes = Math.max(0, Number(duration) || 0) * MP3_EXPORT_SAMPLE_RATE * 4 * 2;
+  return fileBytes >= MP3_EXPORT_STREAM_FILE_BYTES || pcmBytes >= MP3_EXPORT_STREAM_PCM_BYTES;
+}
+function _mp3ExportMediaError(media) {
+  const code = Number(media && media.error && media.error.code) || 0;
+  const label = ({ 1:'재생 취소', 2:'파일 읽기', 3:'오디오 디코딩', 4:'지원하지 않는 코덱' })[code] || '미디어 재생';
+  return label + ' 오류' + (code ? ' (코드 ' + code + ')' : '');
+}
+async function _mp3ExportCreateStreamingSource(snapshot, itemLabel = '현재 영상') {
+  const AudioContextType = window.AudioContext || window.webkitAudioContext;
+  if (typeof AudioContextType !== 'function') throw new Error('이 브라우저는 MP3 실시간 오디오 처리를 지원하지 않습니다.');
+  let file = snapshot.file;
+  if (!file || typeof URL.createObjectURL !== 'function') file = await _mp3ExportFreshSourceFile(snapshot, 'video');
+  const createForFile = async candidate => {
+    const media = document.createElement('video');
+    media.preload = 'auto';
+    media.playsInline = true;
+    media.setAttribute('playsinline', '');
+    media.disablePictureInPicture = true;
+    media.controls = false;
+    media.muted = true;
+    media.volume = 1;
+    media.style.cssText = 'position:fixed;left:-4px;top:-4px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1;';
+    document.body.appendChild(media);
+
+    let audioContext = null;
+    let sourceNode = null;
+    let processor = null;
+    let silentGain = null;
+    let objectUrl = '';
+    const state = { media, audioContext:null, sourceNode:null, processor:null, silentGain:null, objectUrl:'', active:null };
+    const cleanupPartial = async () => {
+      state.active = null;
+      try { media.pause(); } catch (_) {}
+      try { if (sourceNode) sourceNode.disconnect(); } catch (_) {}
+      try { if (processor) { processor.onaudioprocess = null; processor.disconnect(); } } catch (_) {}
+      try { if (silentGain) silentGain.disconnect(); } catch (_) {}
+      try { media.removeAttribute('src'); media.load(); } catch (_) {}
+      try { media.remove(); } catch (_) {}
+      try { if (objectUrl) URL.revokeObjectURL(objectUrl); } catch (_) {}
+      try { if (audioContext && audioContext.state !== 'closed') await audioContext.close(); } catch (_) {}
+    };
+    try {
+      audioContext = new AudioContextType({ sampleRate:MP3_EXPORT_SAMPLE_RATE });
+      if (audioContext.sampleRate !== MP3_EXPORT_SAMPLE_RATE) {
+        throw new Error('브라우저 오디오 출력률이 44.1kHz가 아니어서 MP3 변환을 시작할 수 없습니다.');
+      }
+      const resumePromise = audioContext.resume();
+      sourceNode = audioContext.createMediaElementSource(media);
+      processor = audioContext.createScriptProcessor(4096, 2, 2);
+      silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+      state.audioContext = audioContext;
+      state.sourceNode = sourceNode;
+      state.processor = processor;
+      state.silentGain = silentGain;
+      processor.onaudioprocess = audioEvent => {
+        const output = audioEvent.outputBuffer;
+        for (let channel = 0; channel < output.numberOfChannels; channel++) output.getChannelData(channel).fill(0);
+        const active = state.active;
+        if (!active || active.done || media.paused || media.seeking) return;
+        const input = audioEvent.inputBuffer;
+        if (!input || input.length <= 0 || input.numberOfChannels <= 0) return;
+        const count = Math.min(input.length, active.targetFrames - active.frames);
+        if (count <= 0) return;
+        const leftFloat = input.getChannelData(0).subarray(0, count);
+        const rightFloat = input.numberOfChannels > 1 ? input.getChannelData(1).subarray(0, count) : leftFloat;
+        const encoded = active.encoder.encodeBuffer(_phraseRecorderToInt16(leftFloat), _phraseRecorderToInt16(rightFloat));
+        if (encoded && encoded.length) active.chunks.push(encoded);
+        active.frames += count;
+        if (active.onProgress) active.onProgress(active.frames);
+        if (active.frames >= active.targetFrames) {
+          active.done = true;
+          state.active = null;
+          try { media.pause(); } catch (_) {}
+          active.resolve(true);
+        }
+      };
+      media.addEventListener('playing', () => { media.muted = false; }, { passive:true });
+      media.addEventListener('error', () => {
+        const active = state.active;
+        if (active && !active.done) active.reject(new Error(itemLabel + ' ' + _mp3ExportMediaError(media)));
+      });
+      sourceNode.connect(processor);
+      processor.connect(silentGain);
+      silentGain.connect(audioContext.destination);
+      objectUrl = URL.createObjectURL(candidate);
+      state.objectUrl = objectUrl;
+
+      let metadataTimer;
+      const metadataPromise = new Promise((resolve, reject) => {
+        const cleanup = () => {
+          clearTimeout(metadataTimer);
+          media.removeEventListener('loadedmetadata', onReady);
+          media.removeEventListener('error', onError);
+        };
+        const onReady = () => { cleanup(); resolve(true); };
+        const onError = () => { cleanup(); reject(new Error(itemLabel + ' ' + _mp3ExportMediaError(media))); };
+        metadataTimer = setTimeout(() => { cleanup(); reject(new Error(itemLabel + ' 영상 정보를 60초 안에 읽지 못했습니다.')); }, 60000);
+        media.addEventListener('loadedmetadata', onReady, { once:true });
+        media.addEventListener('error', onError, { once:true });
+      });
+      let playingTimer;
+      const playingPromise = new Promise((resolve, reject) => {
+        const cleanup = () => {
+          clearTimeout(playingTimer);
+          media.removeEventListener('playing', onReady);
+          media.removeEventListener('error', onError);
+        };
+        const onReady = () => { media.muted = false; cleanup(); resolve(true); };
+        const onError = () => { cleanup(); reject(new Error(itemLabel + ' ' + _mp3ExportMediaError(media))); };
+        playingTimer = setTimeout(() => { cleanup(); reject(new Error(itemLabel + ' 숨김 오디오 스트리밍이 시작되지 않았습니다.')); }, 60000);
+        media.addEventListener('playing', onReady, { once:true });
+        media.addEventListener('error', onError, { once:true });
+      });
+      media.src = objectUrl;
+      const playPromise = media.play();
+      await Promise.all([resumePromise, metadataPromise, playPromise, playingPromise]);
+      const duration = Number(media.duration);
+      if (!Number.isFinite(duration) || duration <= 0) throw new Error(itemLabel + ' 영상 길이를 확인하지 못했습니다.');
+      media.pause();
+      media.playbackRate = 1;
+      media.preservesPitch = true;
+      media.webkitPreservesPitch = true;
+      media.mozPreservesPitch = true;
+      if (media.currentTime > 0.01) {
+        try { media.currentTime = 0; } catch (_) {}
+      }
+      state.duration = duration;
+      state.cleaned = false;
+      return state;
+    } catch (error) {
+      await cleanupPartial();
+      throw error;
+    }
+  };
+
+  let firstError = null;
+  try { return await createForFile(file); }
+  catch (error) { firstError = error; }
+  try {
+    const fresh = await _mp3ExportFreshSourceFile(snapshot, 'video');
+    if (fresh && fresh !== file) return await createForFile(fresh);
+  } catch (error) {
+    throw new Error(itemLabel + ' 스트리밍 재생 실패: ' + String(error && error.message || error) + ' · 최초 시도: ' + String(firstError && firstError.message || firstError));
+  }
+  throw new Error(itemLabel + ' 스트리밍 재생 실패: ' + String(firstError && firstError.message || firstError));
+}
+async function _mp3ExportSeekStreamingSource(source, time) {
+  const media = source.media;
+  const target = Math.max(0, Math.min(Math.max(0, source.duration - 0.02), Number(time) || 0));
+  media.pause();
+  if (!media.seeking && Math.abs(Number(media.currentTime) - target) <= 0.015) return;
+  await new Promise((resolve, reject) => {
+    let timer;
+    const cleanup = () => {
+      clearTimeout(timer);
+      media.removeEventListener('seeked', onSeeked);
+      media.removeEventListener('error', onError);
+    };
+    const onSeeked = () => { cleanup(); resolve(true); };
+    const onError = () => { cleanup(); reject(new Error(_mp3ExportMediaError(media))); };
+    timer = setTimeout(() => { cleanup(); reject(new Error('영상 오디오를 지정된 반복 구간으로 이동하지 못했습니다.')); }, 30000);
+    media.addEventListener('seeked', onSeeked, { once:true });
+    media.addEventListener('error', onError, { once:true });
+    try { media.currentTime = target; }
+    catch (error) { cleanup(); reject(new Error('영상 오디오 구간 이동 실패: ' + String(error && error.message || error))); }
+  });
+}
+async function _mp3ExportRenderStreamingMp3(source, plan, bitrate, onProgress, options = {}) {
+  const encoder = options.encoder || new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, bitrate);
+  const chunks = [];
+  const media = source.media;
+  const totalFrames = Math.ceil(plan.duration * MP3_EXPORT_SAMPLE_RATE);
+  let encodedFrames = 0;
+  let lastPercent = -1;
+  for (let segmentIndex = 0; segmentIndex < plan.segments.length && encodedFrames < totalFrames; segmentIndex++) {
+    const segment = plan.segments[segmentIndex];
+    const segmentEndFrame = segmentIndex === plan.segments.length - 1
+      ? totalFrames
+      : Math.min(totalFrames, Math.round(segment.outputEnd * MP3_EXPORT_SAMPLE_RATE));
+    const segmentFrames = Math.max(0, segmentEndFrame - encodedFrames);
+    if (!segmentFrames) continue;
+    await _mp3ExportSeekStreamingSource(source, segment.sourceStart);
+    media.playbackRate = Math.max(0.1, Math.min(2, Number(segment.rate) || 1));
+    media.preservesPitch = true;
+    media.webkitPreservesPitch = true;
+    media.mozPreservesPitch = true;
+    let resolveFrames;
+    let rejectFrames;
+    const framePromise = new Promise((resolve, reject) => { resolveFrames = resolve; rejectFrames = reject; });
+    const renderState = {
+      encoder, chunks, targetFrames:segmentFrames, frames:0, done:false,
+      resolve:resolveFrames, reject:rejectFrames,
+      onProgress:frames => {
+        const percent = Math.floor(Math.min(1, (encodedFrames + frames) / totalFrames) * 100);
+        if (percent !== lastPercent) { lastPercent = percent; onProgress(Math.min(1, (encodedFrames + frames) / totalFrames)); }
+      }
+    };
+    source.active = renderState;
+    const segmentSeconds = segmentFrames / MP3_EXPORT_SAMPLE_RATE;
+    const timeoutMs = Math.max(30000, Math.min(12 * 60 * 60 * 1000, segmentSeconds * 2500 + 30000));
+    let timeout;
+    try {
+      const playPromise = media.play();
+      playPromise.catch(error => {
+        if (!renderState.done) {
+          renderState.done = true;
+          if (source.active === renderState) source.active = null;
+          rejectFrames(new Error('숨김 오디오 재생을 시작하지 못했습니다: ' + String(error && error.message || error)));
+        }
+      });
+      const timeoutPromise = new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('MP3 스트리밍 처리 시간이 초과되었습니다.')), timeoutMs);
+      });
+      await Promise.race([framePromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeout);
+      renderState.done = true;
+      if (source.active === renderState) source.active = null;
+      media.pause();
+    }
+    encodedFrames += segmentFrames;
+    if (lastPercent !== Math.floor(Math.min(1, encodedFrames / totalFrames) * 100)) {
+      lastPercent = Math.floor(Math.min(1, encodedFrames / totalFrames) * 100);
+      onProgress(Math.min(1, encodedFrames / totalFrames));
+    }
+  }
+  if (options.flushEncoder !== false) {
+    const tail = encoder.flush();
+    if (tail && tail.length) chunks.push(tail);
+  }
+  return { chunks, encoder };
+}
+async function _mp3ExportCleanupStreamingSource(source) {
+  if (!source || source.cleaned) return;
+  source.cleaned = true;
+  source.active = null;
+  try { source.media.pause(); } catch (_) {}
+  try { source.sourceNode.disconnect(); } catch (_) {}
+  try { source.processor.onaudioprocess = null; source.processor.disconnect(); } catch (_) {}
+  try { source.silentGain.disconnect(); } catch (_) {}
+  try { source.media.removeAttribute('src'); source.media.load(); source.media.remove(); } catch (_) {}
+  try { if (source.objectUrl) URL.revokeObjectURL(source.objectUrl); } catch (_) {}
+  try { if (source.audioContext && source.audioContext.state !== 'closed') await source.audioContext.close(); } catch (_) {}
+}
+async function _mp3ExportPrepareAudio(snapshot, itemLabel) {
+  const file = snapshot.file;
+  if (_mp3ExportShouldStream(file, snapshot.duration)) {
+    _mp3ExportStatus(itemLabel + ' · 큰 원본을 메모리에 올리지 않고 스트리밍 준비 중…');
+    return { streamingSource:await _mp3ExportCreateStreamingSource(snapshot, itemLabel), audioBuffer:null };
+  }
+  try {
+    return { audioBuffer:await _mp3ExportDecodeAudio(snapshot, itemLabel), streamingSource:null };
+  } catch (decodeError) {
+    _mp3ExportStatus(itemLabel + ' · 전체 파일 디코딩 대신 메모리 절약 스트리밍으로 전환합니다…');
+    try {
+      return { audioBuffer:null, streamingSource:await _mp3ExportCreateStreamingSource(snapshot, itemLabel) };
+    } catch (streamError) {
+      throw new Error(itemLabel + ' MP3 원본 처리 실패 · 전체 파일 메모리 디코딩: ' + String(decodeError && decodeError.message || decodeError) + ' · 스트리밍 재생: ' + String(streamError && streamError.message || streamError));
+    }
+  }
 }
 async function exportPlaybackMp3(event) {
   if (!event || event.isTrusted !== true) {
@@ -6985,15 +7254,21 @@ async function exportPlaybackMp3(event) {
   mp3ExportBusyMode = 'current';
   if (download) download.style.display = 'none';
   _mp3ExportStatus('현재 반복 옵션을 읽고 MP3 출력 순서를 구성합니다.');
+  let streamingSource = null;
   try {
-    const audioBuffer = await _mp3ExportDecodeAudio(snapshot, '현재 영상');
-    const plan = _mp3ExportBuildPlan(snapshot, audioBuffer.duration);
+    const prepared = await _mp3ExportPrepareAudio(snapshot, '현재 영상');
+    streamingSource = prepared.streamingSource;
+    const sourceDuration = prepared.audioBuffer ? prepared.audioBuffer.duration : streamingSource.duration;
+    const plan = _mp3ExportBuildPlan(snapshot, sourceDuration);
     const bitrate = snapshot.bitrate;
     await _phraseRecorderEnsureLame();
-    _mp3ExportStatus('MP3 렌더링 중 · ' + plan.description + ' · 0%');
-    const rendered = await _mp3ExportRenderMp3(audioBuffer, plan, bitrate, ratio => {
-      _mp3ExportStatus('MP3 렌더링 중 · ' + plan.description + ' · ' + Math.floor(ratio * 100) + '%');
-    });
+    _mp3ExportStatus((streamingSource ? '실시간 스트리밍 MP3 생성 중 · ' : 'MP3 렌더링 중 · ') + plan.description + ' · 0%');
+    const progress = ratio => {
+      _mp3ExportStatus((streamingSource ? '실시간 스트리밍 MP3 생성 중 · ' : 'MP3 렌더링 중 · ') + plan.description + ' · ' + Math.floor(ratio * 100) + '%');
+    };
+    const rendered = streamingSource
+      ? await _mp3ExportRenderStreamingMp3(streamingSource, plan, bitrate, progress)
+      : await _mp3ExportRenderMp3(prepared.audioBuffer, plan, bitrate, progress);
     const blob = new Blob(rendered.chunks, { type:'audio/mpeg' });
     if (!blob || blob.size <= 0) throw new Error('MP3 결과가 비어 있습니다.');
 
@@ -7017,6 +7292,7 @@ async function exportPlaybackMp3(event) {
     if (download && oldLinkUrl) download.style.display = 'inline-block';
     return false;
   } finally {
+    await _mp3ExportCleanupStreamingSource(streamingSource);
     mp3ExportBusy = false;
     mp3ExportBusyMode = '';
     _mp3ExportStatus(document.getElementById('mp3ExportStatus')?.textContent || '', exportFailed);
@@ -7077,8 +7353,13 @@ async function exportPlaylistMp3(event) {
         subIndex:index === currentIndex ? settings.subIndex : 0,
         subtitles:[]
       };
+      let streamingSource = null;
       try {
-        const audioBuffer = await _mp3ExportDecodeAudio(snapshot, '목록 ' + (index + 1) + '/' + items.length + ' · ' + label);
+        const itemLabel = '목록 ' + (index + 1) + '/' + items.length + ' · ' + label;
+        const prepared = await _mp3ExportPrepareAudio(snapshot, itemLabel);
+        streamingSource = prepared.streamingSource;
+        const audioBuffer = prepared.audioBuffer;
+        const sourceDuration = audioBuffer ? audioBuffer.duration : streamingSource.duration;
         if (snapshot.srtFile || snapshot.srtHandle || item.srtPath || item.placeholderSrtName) {
           const srtBytes = await _mp3ExportReadSourceBytes(snapshot, 'srt');
           const srtText = new TextDecoder('utf-8').decode(srtBytes);
@@ -7090,7 +7371,7 @@ async function exportPlaylistMp3(event) {
             !snapshot.subtitles.some(cue => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.start >= 0 && cue.end > cue.start)) {
           throw new Error('현재 반복·스킵 설정을 적용할 SRT 자막이 없습니다. 해당 영상의 SRT를 재생목록에 연결해 주세요.');
         }
-        const plan = _mp3ExportBuildPlan(snapshot, audioBuffer.duration, Infinity);
+        const plan = _mp3ExportBuildPlan(snapshot, sourceDuration, Infinity);
         totalDuration += plan.duration;
         totalSegments += plan.segments.length;
         if (totalSegments > 200000) throw new Error('전체 출력 구간이 200,000개를 넘습니다. 반복 횟수나 목록을 나눠 주세요.');
@@ -7102,14 +7383,19 @@ async function exportPlaylistMp3(event) {
             encoder = new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, settings.bitrate);
           }
           partDuration += planPart.duration;
-          _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · 0%');
-          const rendered = await _mp3ExportRenderMp3(audioBuffer, planPart, settings.bitrate, ratio => {
-            _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · ' + Math.floor(ratio * 100) + '%');
-          }, { encoder, flushEncoder:false });
+          _mp3ExportStatus((streamingSource ? '실시간 스트리밍 목록 MP3 생성 중 · ' : '재생목록 MP3 생성 중 · ') + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · 0%');
+          const progress = ratio => {
+            _mp3ExportStatus((streamingSource ? '실시간 스트리밍 목록 MP3 생성 중 · ' : '재생목록 MP3 생성 중 · ') + (index + 1) + '/' + items.length + ' · 파일 ' + (outputs.length + 1) + ' · ' + label + ' · ' + Math.floor(ratio * 100) + '%');
+          };
+          const rendered = streamingSource
+            ? await _mp3ExportRenderStreamingMp3(streamingSource, planPart, settings.bitrate, progress, { encoder, flushEncoder:false })
+            : await _mp3ExportRenderMp3(audioBuffer, planPart, settings.bitrate, progress, { encoder, flushEncoder:false });
           encodedChunks.push(...rendered.chunks);
         }
       } catch (error) {
         throw new Error('재생목록 ' + (index + 1) + '/' + items.length + ' 항목 [' + label + '] 처리 실패: ' + String(error && error.message || error));
+      } finally {
+        await _mp3ExportCleanupStreamingSource(streamingSource);
       }
     }
     finishPart();
