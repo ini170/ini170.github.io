@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C513';
+document.documentElement.dataset.vpBuild = 'C514';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -6099,7 +6099,7 @@ function _phraseRecorderChooseDestination() {
     return Promise.reject(new Error('이 브라우저는 폴더 저장을 지원하지 않습니다. Chrome 또는 Edge에서 열어 주세요.'));
   }
   let pending;
-  try { pending = window.showDirectoryPicker({ id:'vp-phrase-recordings', mode:'readwrite', startIn:'videos' }); }
+  try { pending = window.showDirectoryPicker({ id:'vp-phrase-recordings-c514', mode:'readwrite', startIn:'videos' }); }
   catch (error) { return Promise.reject(error); }
   return Promise.resolve(pending).then(directory => ({ kind: 'local', directory, name:directory.name || '' }));
 }
