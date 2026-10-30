@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C510';
+document.documentElement.dataset.vpBuild = 'C511';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -7273,7 +7273,7 @@ async function exportPlaybackMp3(event) {
     if (!blob || blob.size <= 0) throw new Error('MP3 결과가 비어 있습니다.');
 
     const baseName = _phraseRecorderSafeName(snapshot.videoName.replace(/\.[^.]+$/, ''), 48) || 'video';
-    const fileName = 'VP_' + _phraseRecorderTimeStamp() + '_' + baseName + '_MP3.mp3';
+    const fileName = baseName + '_VP_' + _phraseRecorderTimeStamp() + '.mp3';
     const nextUrl = URL.createObjectURL(blob);
     if (oldLinkUrl) URL.revokeObjectURL(oldLinkUrl);
     mp3ExportDownloadUrl = nextUrl;
@@ -7403,8 +7403,8 @@ async function exportPlaylistMp3(event) {
     const stamp = _phraseRecorderTimeStamp();
     const fragment = document.createDocumentFragment();
     outputs.forEach((output, index) => {
-      const partSuffix = outputs.length > 1 ? '_MP3_' + String(index + 1).padStart(2, '0') : '_MP3';
-      const fileName = 'VP_' + stamp + '_' + safeListName + '_목록' + items.length + '개' + partSuffix + '.mp3';
+      const partSuffix = outputs.length > 1 ? '_' + String(index + 1).padStart(2, '0') : '';
+      const fileName = safeListName + '_목록' + items.length + '개_VP_' + stamp + partSuffix + '.mp3';
       const url = URL.createObjectURL(output.blob);
       pendingUrls.push(url);
       const link = document.createElement('a');
