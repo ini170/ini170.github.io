@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C506';
+document.documentElement.dataset.vpBuild = 'C507';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1437,7 +1437,9 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         <div id="mp3ExportPanel" style="margin-top:6px;padding-top:6px;border-top:1px solid #292929;">
           <button id="mp3ExportButton" type="button" onclick="exportPlaybackMp3(event)" style="background:#163226;color:#b8f0d2;border:1px solid #376c53;border-radius:3px;padding:4px 10px;cursor:pointer;">mp3출력</button>
           <a id="mp3ExportDownload" style="display:none;margin-left:7px;color:#9bd4ff;" download>MP3 다운로드</a>
-          <div id="mp3ExportStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.4;">현재 영상 원음만 반복 설정으로 MP3 출력합니다. 속도 변경은 피치를 보존합니다. TTS는 제외하며 무한 반복은 반복 횟수만큼 출력합니다.</div>
+          <button id="mp3PlaylistExportButton" type="button" onclick="exportPlaylistMp3(event)" style="margin-left:6px;background:#182c3c;color:#b9dcf7;border:1px solid #3a607d;border-radius:3px;padding:4px 10px;cursor:pointer;">재생목록 전체 MP3</button>
+          <a id="mp3PlaylistExportDownload" style="display:none;margin-left:7px;color:#9bd4ff;" download>재생목록 MP3 다운로드</a>
+          <div id="mp3ExportStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.4;">현재 영상 또는 재생목록 전체를 현재 반복 설정대로 MP3 출력합니다. 속도 변경은 피치를 보존하고 TTS는 제외합니다.</div>
         </div>
       </div>
       <!-- 여분 설정 -->
@@ -6399,7 +6401,9 @@ const MP3_EXPORT_SAMPLE_RATE = 44100;
 const MP3_EXPORT_CHUNK_SECONDS = 5;
 const MP3_EXPORT_MAX_OUTPUT_SECONDS = 4 * 60 * 60;
 let mp3ExportBusy = false;
+let mp3ExportBusyMode = '';
 let mp3ExportDownloadUrl = '';
+let mp3PlaylistExportDownloadUrl = '';
 
 function _mp3ExportStatus(message, isError = false) {
   const status = document.getElementById('mp3ExportStatus');
@@ -6408,10 +6412,16 @@ function _mp3ExportStatus(message, isError = false) {
     status.style.color = isError ? '#ff9b91' : '#8da39a';
   }
   const button = document.getElementById('mp3ExportButton');
+  const playlistButton = document.getElementById('mp3PlaylistExportButton');
   if (button) {
     button.disabled = mp3ExportBusy;
-    button.textContent = mp3ExportBusy ? 'MP3 생성 중…' : 'mp3출력';
+    button.textContent = mp3ExportBusy && mp3ExportBusyMode === 'current' ? 'MP3 생성 중…' : 'mp3출력';
     button.style.opacity = mp3ExportBusy ? '0.65' : '1';
+  }
+  if (playlistButton) {
+    playlistButton.disabled = mp3ExportBusy;
+    playlistButton.textContent = mp3ExportBusy && mp3ExportBusyMode === 'playlist' ? '목록 MP3 생성 중…' : '재생목록 전체 MP3';
+    playlistButton.style.opacity = mp3ExportBusy ? '0.65' : '1';
   }
 }
 
@@ -6425,23 +6435,8 @@ function _mp3ExportFmtTime(seconds) {
     : String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
 }
 
-function _mp3ExportSnapshot() {
-  const item = playlist && playlist[currentIndex] || {};
-  const file = item.video;
-  if (!file || typeof file.arrayBuffer !== 'function') {
-    throw new Error('현재 영상 원본 파일을 찾지 못했습니다. 재생목록에서 로컬 파일을 다시 연결해 주세요.');
-  }
-  const duration = Number(video.duration);
-  if (!Number.isFinite(duration) || duration <= 0 || video.readyState < 1) {
-    throw new Error('영상의 길이를 읽을 수 없습니다. 영상 로딩이 끝난 뒤 다시 시도해 주세요.');
-  }
+function _mp3ExportSettingsSnapshot() {
   return {
-    file,
-    accessId:String(item.accessId || ''),
-    itemIndex:currentIndex,
-    videoName:String(file.name || item.videoName || 'video'),
-    duration,
-    currentTime:Number.isFinite(video.currentTime) ? video.currentTime : 0,
     bitrate:Math.max(64, Math.min(256, Number(phraseRecordBitrate) || 128)),
     mode:String(loopMode || 'none'),
     rangeLoopEnabled:!!rangeLoopEnabled,
@@ -6457,7 +6452,31 @@ function _mp3ExportSnapshot() {
     baseSpeed:Math.max(0.1, Math.min(2, Number(baseSpeed) || 1)),
     sequentialSlowdownEnabled:!!sequentialSlowdownEnabled,
     minPlaybackSpeed:Math.max(0.1, Math.min(2, Number(minPlaybackSpeed) || 0.8)),
-    targetRepeatCount:Math.max(1, Math.floor(Number(targetRepeatCount) || 1)),
+    targetRepeatCount:Math.max(1, Math.floor(Number(targetRepeatCount) || 1))
+  };
+}
+
+function _mp3ExportSnapshot() {
+  const item = playlist && playlist[currentIndex] || {};
+  const file = item.video;
+  if (!file || typeof file.arrayBuffer !== 'function') {
+    throw new Error('현재 영상 원본 파일을 찾지 못했습니다. 재생목록에서 로컬 파일을 다시 연결해 주세요.');
+  }
+  const duration = Number(video.duration);
+  if (!Number.isFinite(duration) || duration <= 0 || video.readyState < 1) {
+    throw new Error('영상의 길이를 읽을 수 없습니다. 영상 로딩이 끝난 뒤 다시 시도해 주세요.');
+  }
+  return {
+    ..._mp3ExportSettingsSnapshot(),
+    file,
+    fileHandle:item.videoHandle || null,
+    srtFile:item.srt || null,
+    srtHandle:item.srtHandle || null,
+    accessId:String(item.accessId || ''),
+    itemIndex:currentIndex,
+    videoName:String(file.name || item.videoName || 'video'),
+    duration,
+    currentTime:Number.isFinite(video.currentTime) ? video.currentTime : 0,
     subtitles:Array.isArray(subtitles) ? subtitles.map(cue => ({
       start:Number(cue && cue.start),
       end:Number(cue && cue.end),
@@ -6765,8 +6784,8 @@ function _mp3ExportCreatePitchPreservingStream(audioBuffer, segment, targetFrame
   };
 }
 
-async function _mp3ExportRenderMp3(audioBuffer, plan, bitrate, onProgress) {
-  const encoder = new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, bitrate);
+async function _mp3ExportRenderMp3(audioBuffer, plan, bitrate, onProgress, options = {}) {
+  const encoder = options.encoder || new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, bitrate);
   const chunks = [];
   const totalFrames = Math.ceil(plan.duration * MP3_EXPORT_SAMPLE_RATE);
   const chunkFrames = MP3_EXPORT_CHUNK_SECONDS * MP3_EXPORT_SAMPLE_RATE;
@@ -6799,11 +6818,13 @@ async function _mp3ExportRenderMp3(audioBuffer, plan, bitrate, onProgress) {
     }
   }
 
-  const tail = encoder.flush();
-  if (tail && tail.length) chunks.push(tail);
-  return new Blob(chunks, { type:'audio/mpeg' });
+  if (options.flushEncoder !== false) {
+    const tail = encoder.flush();
+    if (tail && tail.length) chunks.push(tail);
+  }
+  return { chunks, encoder };
 }
-function _mp3ExportRequestFreshVideoFile(snapshot) {
+function _mp3ExportRequestFreshVideoFile(snapshot, kind = 'video') {
   if (window.parent === window) {
     return Promise.resolve({ ok:false, message:'로컬 파일 참조가 만료되었습니다. 원본 파일을 다시 열어 주세요.' });
   }
@@ -6832,32 +6853,69 @@ function _mp3ExportRequestFreshVideoFile(snapshot) {
     try {
       window.parent.postMessage({
         llt:'vp-access-read-video-file', requestId,
-        accessId:snapshot.accessId, itemIndex:snapshot.itemIndex
+        accessId:snapshot.accessId, itemIndex:snapshot.itemIndex, kind:kind === 'srt' ? 'srt' : 'video'
       }, '*');
     } catch (error) {
       finish({ ok:false, message:'메인 앱에 영상 파일 다시 읽기 요청을 전달하지 못했습니다 (' + String(error && error.name || '오류') + ').' });
     }
   });
 }
-async function _mp3ExportReadSourceBytes(snapshot) {
+async function _mp3ExportFreshSourceFile(snapshot, kind = 'video') {
+  const isSrt = kind === 'srt';
+  const handle = isSrt ? snapshot.srtHandle : snapshot.fileHandle;
+  if (handle && handle.kind === 'file' && typeof handle.getFile === 'function') {
+    try { return await handle.getFile(); } catch (_) {}
+  }
+  const fresh = await _mp3ExportRequestFreshVideoFile(snapshot, kind);
+  if (!fresh || fresh.ok !== true || !fresh.file || typeof fresh.file.arrayBuffer !== 'function') {
+    throw new Error(fresh && fresh.message || (isSrt
+      ? '이 재생목록의 SRT 파일을 다시 읽지 못했습니다. 자막 파일 권한을 허용하거나 다시 연결해 주세요.'
+      : '원본 영상 파일을 다시 읽지 못했습니다. 메인 앱의 전체 파일 권한을 허용한 뒤 다시 시도해 주세요.'));
+  }
+  if (isSrt) snapshot.srtFile = fresh.file;
+  else {
+    snapshot.file = fresh.file;
+    snapshot.videoName = String(fresh.file.name || snapshot.videoName || 'video');
+  }
+  return fresh.file;
+}
+async function _mp3ExportReadSourceBytes(snapshot, kind = 'video') {
+  const isSrt = kind === 'srt';
+  let file = isSrt ? snapshot.srtFile : snapshot.file;
+  if (!file || typeof file.arrayBuffer !== 'function') file = await _mp3ExportFreshSourceFile(snapshot, kind);
   try {
-    return await snapshot.file.arrayBuffer();
+    return await file.arrayBuffer();
   } catch (firstError) {
     _mp3ExportStatus('원본 파일 참조가 만료되어 메인 앱에서 최신 파일을 다시 확인합니다…');
     const originalMessage = String(firstError && (firstError.message || firstError.name) || firstError || '파일 읽기 실패');
-    const fresh = await _mp3ExportRequestFreshVideoFile(snapshot);
-    if (!fresh || fresh.ok !== true || !fresh.file || typeof fresh.file.arrayBuffer !== 'function') {
-      throw new Error(fresh && fresh.message || '원본 영상 파일을 읽지 못했습니다. 메인 앱의 전체 파일 권한을 허용한 뒤 mp3출력을 다시 눌러 주세요. (' + originalMessage + ')');
-    }
-    snapshot.file = fresh.file;
-    snapshot.videoName = String(fresh.file.name || snapshot.videoName || 'video');
+    let fresh;
+    try { fresh = await _mp3ExportFreshSourceFile(snapshot, kind); }
+    catch (error) { throw new Error(String(error && error.message || error) + ' (' + originalMessage + ')'); }
     try {
-      return await fresh.file.arrayBuffer();
+      return await fresh.arrayBuffer();
     } catch (secondError) {
       const message = String(secondError && (secondError.message || secondError.name) || secondError || '파일 읽기 실패');
-      throw new Error('권한이 연결된 원본 파일도 읽지 못했습니다. 메인 앱에서 전체 파일 권한을 다시 허용하고, 파일이 이동·삭제되지 않았는지 확인한 뒤 재생목록을 다시 연결해 주세요. (' + message + ')');
+      throw new Error((isSrt ? '연결된 SRT 파일을 읽지 못했습니다.' : '권한이 연결된 원본 파일도 읽지 못했습니다.') + ' 메인 앱에서 전체 파일 권한을 다시 허용하고 파일을 다시 연결해 주세요. (' + message + ')');
     }
   }
+}
+async function _mp3ExportDecodeAudio(snapshot, itemLabel = '현재 영상') {
+  _mp3ExportStatus(itemLabel + ' · 원본 오디오 디코딩 중…');
+  const Decoder = window.AudioContext || window.webkitAudioContext;
+  if (typeof Decoder !== 'function') throw new Error('이 브라우저는 로컬 오디오 디코딩을 지원하지 않습니다.');
+  let fileData = await _mp3ExportReadSourceBytes(snapshot, 'video');
+  const decoder = new Decoder({ sampleRate:MP3_EXPORT_SAMPLE_RATE });
+  let audioBuffer;
+  try {
+    audioBuffer = await decoder.decodeAudioData(fileData);
+  } catch (error) {
+    throw new Error(itemLabel + ' 오디오 디코딩 실패 · 브라우저 코덱 미지원 또는 메모리 부족일 수 있습니다. (' + String(error && error.message || error) + ')');
+  } finally {
+    fileData = null;
+    try { if (decoder.state !== 'closed') await decoder.close(); } catch (_) {}
+  }
+  if (!audioBuffer || audioBuffer.length <= 0) throw new Error(itemLabel + '에서 오디오 트랙을 찾지 못했습니다.');
+  return audioBuffer;
 }
 async function exportPlaybackMp3(event) {
   if (!event || event.isTrusted !== true) {
@@ -6878,32 +6936,19 @@ async function exportPlaybackMp3(event) {
   }
 
   mp3ExportBusy = true;
+  mp3ExportBusyMode = 'current';
   if (download) download.style.display = 'none';
   _mp3ExportStatus('현재 반복 옵션을 읽고 MP3 출력 순서를 구성합니다.');
   try {
-    _mp3ExportStatus('원본 오디오 디코딩 중… 큰 영상은 완료까지 시간이 걸릴 수 있습니다.');
-    const Decoder = window.AudioContext || window.webkitAudioContext;
-    if (typeof Decoder !== 'function') throw new Error('이 브라우저는 로컬 오디오 디코딩을 지원하지 않습니다.');
-    let fileData = await _mp3ExportReadSourceBytes(snapshot);
-    const decoder = new Decoder({ sampleRate:MP3_EXPORT_SAMPLE_RATE });
-    let audioBuffer;
-    try {
-      audioBuffer = await decoder.decodeAudioData(fileData);
-    } catch (error) {
-      throw new Error('영상 오디오 디코딩에 실패했습니다. 브라우저가 지원하지 않는 코덱이거나 사용 가능한 메모리가 부족할 수 있습니다. (' + String(error && error.message || error) + ')');
-    } finally {
-      fileData = null;
-      try { if (decoder.state !== 'closed') await decoder.close(); } catch (_) {}
-    }
-    if (!audioBuffer || audioBuffer.length <= 0) throw new Error('현재 파일에서 오디오 트랙을 찾지 못했습니다.');
-
+    const audioBuffer = await _mp3ExportDecodeAudio(snapshot, '현재 영상');
     const plan = _mp3ExportBuildPlan(snapshot, audioBuffer.duration);
     const bitrate = snapshot.bitrate;
     await _phraseRecorderEnsureLame();
     _mp3ExportStatus('MP3 렌더링 중 · ' + plan.description + ' · 0%');
-    const blob = await _mp3ExportRenderMp3(audioBuffer, plan, bitrate, ratio => {
+    const rendered = await _mp3ExportRenderMp3(audioBuffer, plan, bitrate, ratio => {
       _mp3ExportStatus('MP3 렌더링 중 · ' + plan.description + ' · ' + Math.floor(ratio * 100) + '%');
     });
+    const blob = new Blob(rendered.chunks, { type:'audio/mpeg' });
     if (!blob || blob.size <= 0) throw new Error('MP3 결과가 비어 있습니다.');
 
     const baseName = _phraseRecorderSafeName(snapshot.videoName.replace(/\.[^.]+$/, ''), 48) || 'video';
@@ -6927,7 +6972,108 @@ async function exportPlaybackMp3(event) {
     return false;
   } finally {
     mp3ExportBusy = false;
+    mp3ExportBusyMode = '';
     _mp3ExportStatus(document.getElementById('mp3ExportStatus')?.textContent || '', exportFailed);
+  }
+}
+async function exportPlaylistMp3(event) {
+  if (!event || event.isTrusted !== true) {
+    _mp3ExportStatus('재생목록 MP3 출력은 플레이어의 버튼을 직접 눌러 시작해 주세요.', true);
+    return false;
+  }
+  if (mp3ExportBusy) return false;
+  const items = Array.isArray(playlist) ? playlist.slice() : [];
+  if (!items.length) {
+    _mp3ExportStatus('재생목록이 비어 있습니다. 먼저 로컬 영상 파일을 추가해 주세요.', true);
+    return false;
+  }
+  const settings = _mp3ExportSettingsSnapshot();
+  const download = document.getElementById('mp3PlaylistExportDownload');
+  const oldUrl = mp3PlaylistExportDownloadUrl;
+  let failed = false;
+  mp3ExportBusy = true;
+  mp3ExportBusyMode = 'playlist';
+  if (download) download.style.display = 'none';
+  _mp3ExportStatus('재생목록 ' + items.length + '개 항목을 목록 순서로 준비합니다.');
+  try {
+    await _phraseRecorderEnsureLame();
+    const encoder = new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, settings.bitrate);
+    const encodedChunks = [];
+    let totalDuration = 0;
+    let totalSegments = 0;
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index] || {};
+      const label = String(item.video?.name || item.videoHandle?.name || item.placeholderVideoName || '항목 ' + (index + 1));
+      const snapshot = {
+        ...settings,
+        file:item.video || null,
+        fileHandle:item.videoHandle || null,
+        srtFile:item.srt || null,
+        srtHandle:item.srtHandle || null,
+        accessId:String(item.accessId || ''),
+        itemIndex:index,
+        videoName:label,
+        duration:0,
+        currentTime:0,
+        loopCueSelectionIndex:index === currentIndex ? settings.loopCueSelectionIndex : 0,
+        subIndex:index === currentIndex ? settings.subIndex : 0,
+        subtitles:[]
+      };
+      try {
+        const audioBuffer = await _mp3ExportDecodeAudio(snapshot, '목록 ' + (index + 1) + '/' + items.length + ' · ' + label);
+        if (snapshot.srtFile || snapshot.srtHandle || item.srtPath || item.placeholderSrtName) {
+          const srtBytes = await _mp3ExportReadSourceBytes(snapshot, 'srt');
+          const srtText = new TextDecoder('utf-8').decode(srtBytes);
+          snapshot.subtitles = parseSRT(srtText.replace(/^\uFEFF/, '')).map(cue => ({
+            start:Number(cue && cue.start), end:Number(cue && cue.end), text:String(cue && cue.text || '')
+          }));
+        }
+        if (!snapshot.rangeLoopEnabled && (snapshot.mode === 'sub' || snapshot.mode === 'all' || snapshot.skipGaps) &&
+            !snapshot.subtitles.some(cue => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.start >= 0 && cue.end > cue.start)) {
+          throw new Error('현재 반복·스킵 설정을 적용할 SRT 자막이 없습니다. 해당 영상의 SRT를 재생목록에 연결해 주세요.');
+        }
+        const plan = _mp3ExportBuildPlan(snapshot, audioBuffer.duration);
+        totalDuration += plan.duration;
+        totalSegments += plan.segments.length;
+        if (totalDuration > MP3_EXPORT_MAX_OUTPUT_SECONDS) {
+          throw new Error('전체 MP3 예상 길이가 4시간을 넘습니다. 재생목록을 나눠 출력해 주세요.');
+        }
+        if (totalSegments > 200000) throw new Error('전체 출력 구간이 200,000개를 넘습니다. 반복 횟수나 목록을 나눠 주세요.');
+        _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · ' + label + ' · 0%');
+        const rendered = await _mp3ExportRenderMp3(audioBuffer, plan, settings.bitrate, ratio => {
+          _mp3ExportStatus('재생목록 MP3 생성 중 · ' + (index + 1) + '/' + items.length + ' · ' + label + ' · ' + Math.floor(ratio * 100) + '%');
+        }, { encoder, flushEncoder:false });
+        encodedChunks.push(...rendered.chunks);
+      } catch (error) {
+        throw new Error('재생목록 ' + (index + 1) + '/' + items.length + ' 항목 [' + label + '] 처리 실패: ' + String(error && error.message || error));
+      }
+    }
+    const tail = encoder.flush();
+    if (tail && tail.length) encodedChunks.push(tail);
+    const blob = new Blob(encodedChunks, { type:'audio/mpeg' });
+    if (!blob.size) throw new Error('재생목록 MP3 결과가 비어 있습니다.');
+    const safeListName = _phraseRecorderSafeName(items[0]?.video?.name?.replace(/\.[^.]+$/, '') || 'playlist', 36) || 'playlist';
+    const fileName = 'VP_' + _phraseRecorderTimeStamp() + '_' + safeListName + '_목록' + items.length + '개_MP3.mp3';
+    const nextUrl = URL.createObjectURL(blob);
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+    mp3PlaylistExportDownloadUrl = nextUrl;
+    if (download) {
+      download.href = nextUrl;
+      download.download = fileName;
+      download.textContent = '재생목록 MP3 다운로드 · ' + fileName;
+      download.style.display = 'inline-block';
+    }
+    _mp3ExportStatus('완료 · ' + items.length + '개 항목 · ' + _mp3ExportFmtTime(totalDuration) + ' · ' + Math.max(1, Math.round(blob.size / 1024)) + ' KB · 목록 순서 · TTS 제외');
+    return true;
+  } catch (error) {
+    failed = true;
+    _mp3ExportStatus(String(error && error.message || error || '재생목록 MP3 출력에 실패했습니다.'), true);
+    if (download && oldUrl) download.style.display = 'inline-block';
+    return false;
+  } finally {
+    mp3ExportBusy = false;
+    mp3ExportBusyMode = '';
+    _mp3ExportStatus(document.getElementById('mp3ExportStatus')?.textContent || '', failed);
   }
 }
 async function startPhraseRecording(event) {
