@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C502';
+document.documentElement.dataset.vpBuild = 'C503';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1437,7 +1437,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
         <div id="mp3ExportPanel" style="margin-top:6px;padding-top:6px;border-top:1px solid #292929;">
           <button id="mp3ExportButton" type="button" onclick="exportPlaybackMp3(event)" style="background:#163226;color:#b8f0d2;border:1px solid #376c53;border-radius:3px;padding:4px 10px;cursor:pointer;">mp3출력</button>
           <a id="mp3ExportDownload" style="display:none;margin-left:7px;color:#9bd4ff;" download>MP3 다운로드</a>
-          <div id="mp3ExportStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.4;">현재 영상 원음만 반복 설정으로 MP3 출력합니다. TTS는 제외하며 무한 반복은 반복 횟수만큼 출력합니다.</div>
+          <div id="mp3ExportStatus" role="status" aria-live="polite" style="margin-top:4px;color:#777;line-height:1.4;">현재 영상 원음만 반복 설정으로 MP3 출력합니다. 속도 변경은 피치를 보존합니다. TTS는 제외하며 무한 반복은 반복 횟수만큼 출력합니다.</div>
         </div>
       </div>
       <!-- 여분 설정 -->
@@ -6382,7 +6382,7 @@ async function _phraseRecorderCleanup(session) {
   }
 }
 const MP3_EXPORT_SAMPLE_RATE = 44100;
-const MP3_EXPORT_CHUNK_SECONDS = 30;
+const MP3_EXPORT_CHUNK_SECONDS = 5;
 const MP3_EXPORT_MAX_OUTPUT_SECONDS = 4 * 60 * 60;
 const MP3_EXPORT_MAX_PCM_BYTES = 1024 * 1024 * 1024;
 let mp3ExportBusy = false;
@@ -6589,61 +6589,205 @@ function _mp3ExportBuildPlan(snapshot, sourceDuration) {
   return { segments, duration:outputDuration, description };
 }
 
-async function _mp3ExportRenderMp3(audioBuffer, plan, bitrate, onProgress) {
-  const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  if (typeof OfflineContext !== 'function') {
-    throw new Error('이 브라우저는 오프라인 오디오 렌더링을 지원하지 않습니다.');
+function _mp3ExportCreatePitchPreservingStream(audioBuffer, segment, targetFrames) {
+  const outputRate = MP3_EXPORT_SAMPLE_RATE;
+  const inputRate = audioBuffer.sampleRate;
+  const sourceStart = Math.max(0, segment.sourceStart * inputRate);
+  const sourceEnd = Math.min(audioBuffer.length, segment.sourceEnd * inputRate);
+  const sourceStep = inputRate / outputRate;
+  const rate = Math.max(0.1, Math.min(2, Number(segment.rate) || 1));
+  const channelCount = Math.max(1, Number(audioBuffer.numberOfChannels) || 1);
+  const channelData = [];
+  for (let i = 0; i < channelCount; i++) channelData.push(audioBuffer.getChannelData(i));
+
+  function channelSample(channel, position) {
+    if (position < sourceStart || position >= sourceEnd) return 0;
+    const index = Math.floor(position);
+    const fraction = position - index;
+    const nextIndex = index + 1;
+    const a = channel[index] || 0;
+    const b = nextIndex < sourceEnd ? (channel[nextIndex] || 0) : 0;
+    return a + (b - a) * fraction;
   }
+  function sampleLeft(position) {
+    if (channelCount === 1) return channelSample(channelData[0], position);
+    let value = channelSample(channelData[0], position);
+    if (channelCount === 3 || channelCount === 5 || channelCount >= 6) {
+      value += channelSample(channelData[2], position) * 0.70710678;
+    }
+    if (channelCount === 4) value += channelSample(channelData[2], position) * 0.70710678;
+    else if (channelCount === 5) value += channelSample(channelData[3], position) * 0.70710678;
+    else if (channelCount >= 6) value += channelSample(channelData[4], position) * 0.70710678;
+    return value;
+  }
+  function sampleRight(position) {
+    if (channelCount === 1) return channelSample(channelData[0], position);
+    let value = channelSample(channelData[1], position);
+    if (channelCount === 3 || channelCount === 5 || channelCount >= 6) {
+      value += channelSample(channelData[2], position) * 0.70710678;
+    }
+    if (channelCount === 4) value += channelSample(channelData[3], position) * 0.70710678;
+    else if (channelCount === 5) value += channelSample(channelData[4], position) * 0.70710678;
+    else if (channelCount >= 6) value += channelSample(channelData[5], position) * 0.70710678;
+    return value;
+  }
+
+  let outputFrame = 0;
+  if (Math.abs(rate - 1) < 0.000001) {
+    return {
+      pull(maxFrames) {
+        const count = Math.min(Math.max(0, maxFrames | 0), targetFrames - outputFrame);
+        const left = new Float32Array(count);
+        const right = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+          const sourcePosition = sourceStart + (outputFrame + i) * sourceStep;
+          left[i] = sampleLeft(sourcePosition);
+          right[i] = sampleRight(sourcePosition);
+        }
+        outputFrame += count;
+        return { left, right };
+      }
+    };
+  }
+
+  let grainFrames = Math.max(512, Math.round(outputRate * 0.04));
+  if (grainFrames % 2) grainFrames++;
+  const hopFrames = Math.floor(grainFrames / 2);
+  const overlapFrames = grainFrames - hopFrames;
+  const searchFrames = Math.max(1, Math.round(inputRate * 0.006));
+  const candidateStep = Math.max(1, Math.round(inputRate * 0.0015));
+  const correlationStep = 12;
+  let ringLeft = new Float32Array(grainFrames);
+  let ringRight = new Float32Array(grainFrames);
+  let grainIndex = 0;
+  let framesUntilNextGrain = 0;
+  let initialized = false;
+
+  function fillGrain(start, destinationLeft, destinationRight, fromIndex) {
+    for (let i = fromIndex; i < grainFrames; i++) {
+      const position = start + i * sourceStep;
+      destinationLeft[i] = sampleLeft(position);
+      destinationRight[i] = sampleRight(position);
+    }
+  }
+  function addFirstGrain() {
+    fillGrain(sourceStart, ringLeft, ringRight, 0);
+    grainIndex = 0;
+    framesUntilNextGrain = hopFrames;
+    initialized = true;
+  }
+  function addNextGrain() {
+    grainIndex++;
+    const expectedStart = sourceStart + grainIndex * hopFrames * rate * sourceStep;
+    const minStart = sourceStart;
+    const maxStart = Math.max(minStart, sourceEnd - 1);
+    const low = Math.max(minStart, expectedStart - searchFrames);
+    const high = Math.min(maxStart, expectedStart + searchFrames);
+    const referenceEnergy = (() => {
+      let energy = 0;
+      for (let i = 0; i < overlapFrames; i += correlationStep) {
+        const sample = (ringLeft[i] + ringRight[i]) * 0.5;
+        energy += sample * sample;
+      }
+      return energy;
+    })();
+    let bestStart = Math.max(minStart, Math.min(maxStart, expectedStart));
+    let bestScore = -Infinity;
+    if (referenceEnergy > 1e-10 && high >= low) {
+      for (let candidate = low; candidate <= high; candidate += candidateStep) {
+        let dot = 0;
+        let candidateEnergy = 0;
+        for (let i = 0; i < overlapFrames; i += correlationStep) {
+          const sample = (sampleLeft(candidate + i * sourceStep) + sampleRight(candidate + i * sourceStep)) * 0.5;
+          const reference = (ringLeft[i] + ringRight[i]) * 0.5;
+          dot += reference * sample;
+          candidateEnergy += sample * sample;
+        }
+        if (candidateEnergy <= 1e-10) continue;
+        const score = dot / Math.sqrt(referenceEnergy * candidateEnergy);
+        if (score > bestScore) {
+          bestScore = score;
+          bestStart = candidate;
+        }
+      }
+    }
+
+    for (let i = 0; i < overlapFrames; i++) {
+      const blend = 0.5 - 0.5 * Math.cos(Math.PI * (i + 1) / (overlapFrames + 1));
+      const left = sampleLeft(bestStart + i * sourceStep);
+      const right = sampleRight(bestStart + i * sourceStep);
+      ringLeft[i] = ringLeft[i] * (1 - blend) + left * blend;
+      ringRight[i] = ringRight[i] * (1 - blend) + right * blend;
+    }
+    fillGrain(bestStart, ringLeft, ringRight, overlapFrames);
+
+    framesUntilNextGrain = hopFrames;
+  }
+
+  return {
+    pull(maxFrames) {
+      const count = Math.min(Math.max(0, maxFrames | 0), targetFrames - outputFrame);
+      const left = new Float32Array(count);
+      const right = new Float32Array(count);
+      if (!initialized && count > 0) addFirstGrain();
+      let written = 0;
+      while (written < count) {
+        if (framesUntilNextGrain <= 0 && outputFrame < targetFrames) addNextGrain();
+        const amount = Math.min(count - written, framesUntilNextGrain, targetFrames - outputFrame);
+        if (amount <= 0) break;
+        left.set(ringLeft.subarray(0, amount), written);
+        right.set(ringRight.subarray(0, amount), written);
+        ringLeft.copyWithin(0, amount);
+        ringRight.copyWithin(0, amount);
+        ringLeft.fill(0, grainFrames - amount);
+        ringRight.fill(0, grainFrames - amount);
+        written += amount;
+        outputFrame += amount;
+        framesUntilNextGrain -= amount;
+      }
+      return { left, right };
+    }
+  };
+}
+
+async function _mp3ExportRenderMp3(audioBuffer, plan, bitrate, onProgress) {
   const encoder = new window.lamejs.Mp3Encoder(2, MP3_EXPORT_SAMPLE_RATE, bitrate);
   const chunks = [];
   const totalFrames = Math.ceil(plan.duration * MP3_EXPORT_SAMPLE_RATE);
   const chunkFrames = MP3_EXPORT_CHUNK_SECONDS * MP3_EXPORT_SAMPLE_RATE;
-  let firstActiveSegment = 0;
+  let encodedFrames = 0;
 
-  for (let frameStart = 0; frameStart < totalFrames; frameStart += chunkFrames) {
-    const frameCount = Math.min(chunkFrames, totalFrames - frameStart);
-    const blockStart = frameStart / MP3_EXPORT_SAMPLE_RATE;
-    const blockEnd = (frameStart + frameCount) / MP3_EXPORT_SAMPLE_RATE;
-    const context = new OfflineContext(2, frameCount, MP3_EXPORT_SAMPLE_RATE);
+  for (let segmentIndex = 0; segmentIndex < plan.segments.length && encodedFrames < totalFrames; segmentIndex++) {
+    const segment = plan.segments[segmentIndex];
+    const segmentEndFrame = segmentIndex === plan.segments.length - 1
+      ? totalFrames
+      : Math.min(totalFrames, Math.round(segment.outputEnd * MP3_EXPORT_SAMPLE_RATE));
+    const segmentFrames = Math.max(0, segmentEndFrame - encodedFrames);
+    if (!segmentFrames) continue;
+    const stream = _mp3ExportCreatePitchPreservingStream(audioBuffer, segment, segmentFrames);
+    let renderedSegmentFrames = 0;
 
-    while (firstActiveSegment < plan.segments.length &&
-      plan.segments[firstActiveSegment].outputEnd <= blockStart) firstActiveSegment++;
-
-    for (let i = firstActiveSegment; i < plan.segments.length; i++) {
-      const segment = plan.segments[i];
-      if (segment.outputStart >= blockEnd) break;
-      const outputStart = Math.max(blockStart, segment.outputStart);
-      const outputEnd = Math.min(blockEnd, segment.outputEnd);
-      if (!(outputEnd > outputStart)) continue;
-
-      const sourceOffset = segment.sourceStart + (outputStart - segment.outputStart) * segment.rate;
-      const sourceLength = Math.min(
-        segment.sourceEnd - sourceOffset,
-        (outputEnd - outputStart) * segment.rate
-      );
-      if (!(sourceLength > 0.001)) continue;
-
-      const source = context.createBufferSource();
-      source.buffer = audioBuffer;
-      source.playbackRate.value = segment.rate;
-      source.connect(context.destination);
-      source.start(outputStart - blockStart, sourceOffset, sourceLength);
+    while (renderedSegmentFrames < segmentFrames) {
+      const frameCount = Math.min(chunkFrames, segmentFrames - renderedSegmentFrames);
+      const rendered = stream.pull(frameCount);
+      if (rendered.left.length !== frameCount || rendered.right.length !== frameCount) {
+        throw new Error('MP3 오디오 구간을 끝까지 렌더링하지 못했습니다.');
+      }
+      const left = _phraseRecorderToInt16(rendered.left);
+      const right = _phraseRecorderToInt16(rendered.right);
+      const encoded = encoder.encodeBuffer(left, right);
+      if (encoded && encoded.length) chunks.push(encoded);
+      renderedSegmentFrames += frameCount;
+      encodedFrames += frameCount;
+      onProgress(Math.min(1, encodedFrames / totalFrames));
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
-
-    const rendered = await context.startRendering();
-    const left = _phraseRecorderToInt16(rendered.getChannelData(0));
-    const right = _phraseRecorderToInt16(rendered.getChannelData(1));
-    const encoded = encoder.encodeBuffer(left, right);
-    if (encoded && encoded.length) chunks.push(encoded);
-    onProgress((frameStart + frameCount) / totalFrames);
-    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   const tail = encoder.flush();
   if (tail && tail.length) chunks.push(tail);
   return new Blob(chunks, { type:'audio/mpeg' });
 }
-
 async function exportPlaybackMp3(event) {
   if (!event || event.isTrusted !== true) {
     _mp3ExportStatus('MP3 출력은 플레이어의 mp3출력 버튼을 직접 눌러 시작해 주세요.', true);
