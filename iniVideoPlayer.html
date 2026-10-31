@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C521';
+document.documentElement.dataset.vpBuild = 'C522';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -801,7 +801,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 #subtitleVideoOverlay.ctrl-overlay-hidden-target .overlay-subtitle-content,#transVideoOverlay.ctrl-overlay-hidden-target > :not(.overlay-inline-controls),#hanziVideoOverlay.ctrl-overlay-hidden-target > :not(.overlay-inline-controls) { display:none !important; visibility:hidden !important; }
 #subtitleVideoOverlay.ctrl-overlay-hidden-target::after,#transVideoOverlay.ctrl-overlay-hidden-target::after,#hanziVideoOverlay.ctrl-overlay-hidden-target::after { content:attr(data-overlay-hidden-label); position:absolute; inset:38px 8px 5px; z-index:2; display:grid; place-items:center; padding:4px 8px; color:#dedee2; font:700 12px/1.25 system-ui,sans-serif; text-align:center; text-shadow:0 1px 3px #000; pointer-events:none; }
 /* Keep modifier controls on the video frame, outside scaled text layers. */
-.overlay-inline-controls { position:absolute; z-index:1003; top:0; left:0; display:none; align-items:center; flex-wrap:wrap; gap:4px; width:max-content; max-width:380px; min-width:0; min-height:30px; padding:4px 5px; box-sizing:border-box; border:1px solid rgba(145,145,152,.78); border-radius:5px; background:rgba(26,26,29,.98); color:#e1e1e4; font:600 11px/1.2 system-ui,sans-serif; white-space:normal; pointer-events:auto; box-shadow:0 2px 8px rgba(0,0,0,.58); }
+.overlay-inline-controls { position:absolute; z-index:1003; top:0; left:0; display:none; align-items:center; flex-wrap:wrap; gap:4px; width:max-content; max-width:380px; min-width:0; min-height:30px; padding:4px 5px; box-sizing:border-box; border:1px solid rgba(145,145,152,.78); border-radius:5px; background:rgba(26,26,29,.98); color:#e1e1e4; font:600 11px/1.2 system-ui,sans-serif; white-space:normal; pointer-events:auto; cursor:move; box-shadow:0 2px 8px rgba(0,0,0,.58); }
 .overlay-inline-controls.ctrl-overlay-target { display:flex; }
 .overlay-inline-controls .overlay-inline-name { padding:0 3px; color:#c9c9ce; flex:0 0 auto; }
 .overlay-inline-controls button { min-width:27px; min-height:25px; padding:2px 5px; border:1px solid #57575f; border-radius:4px; background:#303035; color:#dedee2; font:700 10px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
@@ -12479,6 +12479,7 @@ function ensureOverlayModifierControls(container) {
     const name = document.createElement('span');
     name.className = 'overlay-inline-name';
     name.textContent = option.label;
+    name.title = 'Ctrl+드래그로 오버레이 이동';
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'overlay-inline-toggle';
@@ -12644,7 +12645,10 @@ function installPlayerModifierInteraction() {
     if(event?.cancelable)event.preventDefault();
     event?.stopImmediatePropagation();
     try{if(container.hasPointerCapture(gesture.pointerId))container.releasePointerCapture(gesture.pointerId);}catch(_){}
-    if(activate&&!gesture.moved)toggleOverlayForKey(gesture.key);
+    if(activate&&!gesture.moved){
+      if(gesture.controlButton?.isConnected)gesture.controlButton.click();
+      else if(!gesture.fromToolbar)toggleOverlayForKey(gesture.key);
+    }
     if(gesture.moved)queueScaleSave(true);
     if(gesture.moved&&overlayInteractionCtrlHeld){
       overlayInteractionPinnedKey=gesture.key;
@@ -12656,15 +12660,18 @@ function installPlayerModifierInteraction() {
     updateOverlayCtrlTarget(gesture.lastX,gesture.lastY);
   };
   container.addEventListener('pointerdown',event=>{
-    if(event.button!==0||event.pointerType==='touch'||isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
+    const inlineToolbar=event.target instanceof Element?event.target.closest('.overlay-inline-controls'):null;
+    const controlButton=inlineToolbar&&event.target instanceof Element?event.target.closest('button'):null;
+    const fromToolbar=!!inlineToolbar;
+    if(event.button!==0||event.pointerType==='touch'||(!fromToolbar&&isInlineControl(event.target))||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
     if(!(event.ctrlKey||overlayInteractionCtrlHeld)||(event.shiftKey||playerControlsShiftHeld)||audioOnlyMode)return;
     overlayInteractionCtrlHeld=true;
     updateOverlayCtrlTarget(event.clientX,event.clientY);
-    const target=findOverlayTextTargetAt(event.clientX,event.clientY);
+    const target=inlineToolbar?overlayControlTargetForKey(inlineToolbar.dataset.overlayOptionKey):findOverlayTextTargetAt(event.clientX,event.clientY);
     if(!target)return;
     event.preventDefault(); event.stopImmediatePropagation();
     const position=overlayPositionForKey(target.key);
-    ctrlOverlayGesture={pointerId:event.pointerId,key:target.key,startX:event.clientX,startY:event.clientY,lastX:event.clientX,lastY:event.clientY,startPosition:position,moved:false};
+    ctrlOverlayGesture={pointerId:event.pointerId,key:target.key,startX:event.clientX,startY:event.clientY,lastX:event.clientX,lastY:event.clientY,startPosition:position,moved:false,fromToolbar,controlButton};
     overlayInteractionPinnedKey=target.key;
     overlayInteractionPinnedPointer=null;
     updateOverlayCtrlTarget(event.clientX,event.clientY);
