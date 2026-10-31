@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C515';
+document.documentElement.dataset.vpBuild = 'C516';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1825,6 +1825,15 @@ function syncVideoSubtitleOverlayContent() {
   content.className = 'overlay-subtitle-content';
   content.style.display = 'contents';
   content.append(...Array.from(overlay.childNodes, node => node.cloneNode(true)));
+  // The lower subtitle panel and the video overlay share source nodes, but their font scales are independent.
+  // Restore the cloned video lines to their base size so subtitleScale only affects the lower panel.
+  content.querySelectorAll('.vp-copy-line[data-video-font-size]').forEach(line => {
+    const baseSize = Number.parseFloat(line.dataset.videoFontSize);
+    const baseLineHeight = Number.parseFloat(line.dataset.videoLineHeight);
+    if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+    line.style.fontSize = baseSize + 'px';
+    line.style.lineHeight = (Number.isFinite(baseLineHeight) && baseLineHeight > 0 ? baseLineHeight : baseSize * 1.2) + 'px';
+  });
   subtitleVideoOverlay.replaceChildren(...(controls ? [controls] : []), content);
 }
 syncVideoSubtitleOverlayContent();
