@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C516';
+document.documentElement.dataset.vpBuild = 'C517';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -7953,6 +7953,14 @@ video.ontimeupdate=()=>{
 video.onended=()=>{
   if(playlist.length === 0) { video.pause(); return; }
 
+  const hasNextPlaylistItem = currentIndex < playlist.length - 1;
+  // General gap skip takes precedence over single-item repeat when the current caption-bearing video ends.
+  if (skipGaps && subtitles.length > 0 && hasNextPlaylistItem) {
+    currentIndex++;
+    loadVideo(currentIndex, true);
+    setTimeout(() => video.play(), 500);
+    return;
+  }
   if(playlistLoopMode === 'one'){
     loadVideo(currentIndex, true);
     setTimeout(() => video.play(), 500);
@@ -7961,14 +7969,11 @@ video.onended=()=>{
     if(currentIndex >= playlist.length) currentIndex = 0;
     loadVideo(currentIndex, true);
     setTimeout(() => video.play(), 500);
-  } else {
+  } else if (loopMode !== 'none' && hasNextPlaylistItem) {
     // playlistLoopMode === 'none' 이어도 loopMode가 켜져 있으면 다음 영상으로 유지 진행
-    // 일반 구간 스킵 ON이면 자막이 있는 영상의 끝에서도 다음 항목으로 넘긴다.
-    if ((loopMode !== 'none' || (skipGaps && subtitles.length > 0)) && currentIndex < playlist.length - 1) {
-      currentIndex++;
-      loadVideo(currentIndex, true);
-      setTimeout(() => video.play(), 500);
-    }
+    currentIndex++;
+    loadVideo(currentIndex, true);
+    setTimeout(() => video.play(), 500);
   }
 };
 
