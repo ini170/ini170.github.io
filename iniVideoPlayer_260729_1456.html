@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C522';
+document.documentElement.dataset.vpBuild = 'C523';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1579,7 +1579,7 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       <div class="bfp-row">
         <button class="bfp-btn" onclick="video.currentTime=Math.max(video.currentTime-5,0)">↩ -5s</button>
         <button class="bfp-btn" onclick="video.currentTime=Math.min(video.currentTime+5,video.duration)">↪ +5s</button>
-        <button class="bfp-btn" id="bf-skip" onclick="skipGaps=!skipGaps;updateLoopStatus();updateBottomFloatUI();if(skipGaps)triggerSkipGap(true)">⏭ 스킵</button>
+        <button class="bfp-btn" id="bf-skip" onclick="skipGaps=!skipGaps;_skipSubtitlelessChain=null;updateLoopStatus();updateBottomFloatUI();if(skipGaps)triggerSkipGap(true)">⏭ 스킵</button>
       </div>
       <!-- 프레임 이동 -->
       <div class="bfp-row">
@@ -2189,6 +2189,8 @@ let rangeStart = null;      // 구간반복 시작점 (초)
 let rangeEnd = null;        // 구간반복 끝점 (초)
 let rangeLoopEnabled = false; // 구간반복 토글 (loopMode와 독립)
 let skipGaps = false;         // 횟수구간 중 자막 사이 갭 스킵 (P키 토글, 기본 OFF)
+let _skipSubtitlelessChain = null;
+let _pendingSkipPlaylistAutoPlayItem = null;
 let lastOverlaySubIndex = -1; // 마지막으로 오버레이에 표시된 자막 인덱스 (번역 트리거용)
 let timelineZoom = 1.0;      // 타임라인 줌 배율 (1.0 = 핏)
 let timelineScrollLeft = 0;  // 타임라인 스크롤 오프셋 (px)
@@ -4321,6 +4323,7 @@ function loadVideo(i, preserveLoopMode = false){
         if(playlist[currentIndex]!==item)return;
         subtitles=[]; renderSubs(); _videoSubtitleReady=true;
         if(!_applyPendingVideoLoopSnapshot(item))updateLoopStatus();
+        if(skipGaps)applySkipGapAfterVideoLoad(item);
       };
       r.readAsText(srtFile);
     } else {
@@ -4328,6 +4331,7 @@ function loadVideo(i, preserveLoopMode = false){
       renderSubs();
       _videoSubtitleReady = true;
       if (!_applyPendingVideoLoopSnapshot(item)) updateLoopStatus();
+      if (skipGaps) applySkipGapAfterVideoLoad(item);
     }
     video.removeEventListener('loadedmetadata', handleLoadedMetadata);
   };
@@ -4721,11 +4725,67 @@ function focusCurrentTimeline() {
   }
 }
 
+function schedulePlaylistItemPlayback(item, delay = 500) {
+  if (!item || !_playlistItemPlayable(item)) return;
+  _pendingSkipPlaylistAutoPlayItem = item;
+  setTimeout(() => {
+    let subtitleWaits = 0;
+    const attempt = () => {
+      if (playlist[currentIndex] !== item) {
+        if (_pendingSkipPlaylistAutoPlayItem === item) _pendingSkipPlaylistAutoPlayItem = null;
+        return;
+      }
+      if (skipGaps && !_videoSubtitleReady && subtitleWaits++ < 120) {
+        setTimeout(attempt, 100);
+        return;
+      }
+      if (skipGaps && _videoSubtitleReady && subtitles.length === 0) {
+        if (_pendingSkipPlaylistAutoPlayItem === item) _pendingSkipPlaylistAutoPlayItem = null;
+        skipSubtitlelessPlaylistItem(item, true);
+        return;
+      }
+      if (_pendingSkipPlaylistAutoPlayItem === item) _pendingSkipPlaylistAutoPlayItem = null;
+      video.play().catch(() => {});
+    };
+    attempt();
+  }, Math.max(0, Number(delay) || 0));
+}
+
+function skipSubtitlelessPlaylistItem(item, autoPlay = false) {
+  if (!skipGaps || !item || playlist[currentIndex] !== item || !_videoSubtitleReady || subtitles.length > 0) return false;
+  const shouldContinue = autoPlay || !video.paused || _pendingSkipPlaylistAutoPlayItem === item;
+  if (!_skipSubtitlelessChain || _skipSubtitlelessChain.expectedIndex !== currentIndex) {
+    _skipSubtitlelessChain = { expectedIndex:currentIndex, visited:new Set() };
+  }
+  const chain = _skipSubtitlelessChain;
+  chain.visited.add(currentIndex);
+  let nextIndex = currentIndex + 1;
+  if (nextIndex >= playlist.length && playlistLoopMode === 'all') nextIndex = 0;
+  if (nextIndex >= playlist.length || chain.visited.has(nextIndex)) {
+    _skipSubtitlelessChain = null;
+    if (_pendingSkipPlaylistAutoPlayItem === item) _pendingSkipPlaylistAutoPlayItem = null;
+    video.pause();
+    showTimeDisplay('⏭ 자막 있는 다음 영상이 없어 재생을 멈췄습니다', 4500);
+    return true;
+  }
+  const nextItem = playlist[nextIndex];
+  chain.expectedIndex = nextIndex;
+  currentIndex = nextIndex;
+  if (loadVideo(nextIndex, true) === false) {
+    _skipSubtitlelessChain = null;
+    if (_pendingSkipPlaylistAutoPlayItem === item) _pendingSkipPlaylistAutoPlayItem = null;
+    return true;
+  }
+  showTimeDisplay('⏭ 자막 없는 영상 건너뜀', 1600);
+  if (shouldContinue) schedulePlaylistItemPlayback(nextItem, 500);
+  return true;
+}
 // 스킵 갭 점프: 자막 없는 구간 → 다음 자막으로 / 마지막 이후 → 다음 영상
 // forceJump=true: 토글/수동seek 시 loopMode 무관하게 즉시 점프
 // forceJump=false(기본): ontimeupdate 중 — loopMode='none'일 때만 작동
 function triggerSkipGap(forceJump = false) {
-  if (!skipGaps || loopRewinding || inTtsPhase || subtitles.length === 0) return;
+  if (!skipGaps || loopRewinding || inTtsPhase) return;
+  if (subtitles.length === 0) { if (_videoSubtitleReady) skipSubtitlelessPlaylistItem(playlist[currentIndex]); return; }
   if (!forceJump && loopMode !== 'none') return;
   const t = video.currentTime;
   const onSub = subtitles.some(s => t >= s.start && t < s.end);
@@ -4740,7 +4800,7 @@ function triggerSkipGap(forceJump = false) {
     if ((forceJump || loopMode === 'none') && playlist.length > 0 && currentIndex < playlist.length - 1) {
       currentIndex++;
       loadVideo(currentIndex, true);
-      setTimeout(() => video.play(), 500);
+      schedulePlaylistItemPlayback(playlist[currentIndex], 500);
     }
   }
 }
@@ -4748,7 +4808,9 @@ function triggerSkipGap(forceJump = false) {
 // 저장된 재생 위치가 자막 사이여도, 스킵 ON이면 처음 불러온 영상에서 그 구간을 건너뛴다.
 // loadVideo()의 자막 읽기와 영상별 반복 설정 복원이 끝난 뒤 호출하며 재생/일시정지 상태는 건드리지 않는다.
 function applySkipGapAfterVideoLoad(item) {
-  if (!skipGaps || !item || playlist[currentIndex] !== item || subtitles.length === 0) return false;
+  if (!skipGaps || !item || playlist[currentIndex] !== item || !_videoSubtitleReady) return false;
+  if (subtitles.length === 0) return skipSubtitlelessPlaylistItem(item);
+  _skipSubtitlelessChain = null;
   const currentTime = Number(video.currentTime) || 0;
   if (subtitles.some(cue => currentTime >= cue.start && currentTime < cue.end)) return false;
   const nextCue = subtitles.find(cue => cue.start > currentTime + 0.01);
@@ -7920,12 +7982,12 @@ video.ontimeupdate=()=>{
                 // 다음 영상 있음 → 진행
                 currentIndex++;
                 loadVideo(currentIndex, true);
-                setTimeout(() => video.play(), 500);
+                schedulePlaylistItemPlayback(playlist[currentIndex], 500);
               } else if (playlistLoopMode === 'all' && playlist.length > 1) {
                 // 마지막 영상 + 플레이리스트 전체 반복 → 처음 영상으로
                 currentIndex = 0;
                 loadVideo(currentIndex, true);
-                setTimeout(() => video.play(), 500);
+                schedulePlaylistItemPlayback(playlist[currentIndex], 500);
               } else {
                 // 더 진행할 영상 없음 → 루프 종료 + 정지 (onended 의 wrap-around 로 인한 무한루프 방지)
                 loopMode = 'none';
@@ -7964,27 +8026,31 @@ video.ontimeupdate=()=>{
 video.onended=()=>{
   if(playlist.length === 0) { video.pause(); return; }
 
+  if (skipGaps && _videoSubtitleReady && subtitles.length === 0) {
+    skipSubtitlelessPlaylistItem(playlist[currentIndex], true);
+    return;
+  }
   const hasNextPlaylistItem = currentIndex < playlist.length - 1;
   // General gap skip takes precedence over single-item repeat when the current caption-bearing video ends.
   if (skipGaps && subtitles.length > 0 && hasNextPlaylistItem) {
     currentIndex++;
     loadVideo(currentIndex, true);
-    setTimeout(() => video.play(), 500);
+    schedulePlaylistItemPlayback(playlist[currentIndex], 500);
     return;
   }
   if(playlistLoopMode === 'one'){
     loadVideo(currentIndex, true);
-    setTimeout(() => video.play(), 500);
+    schedulePlaylistItemPlayback(playlist[currentIndex], 500);
   } else if(playlistLoopMode === 'all'){
     currentIndex++;
     if(currentIndex >= playlist.length) currentIndex = 0;
     loadVideo(currentIndex, true);
-    setTimeout(() => video.play(), 500);
+    schedulePlaylistItemPlayback(playlist[currentIndex], 500);
   } else if (loopMode !== 'none' && hasNextPlaylistItem) {
     // playlistLoopMode === 'none' 이어도 loopMode가 켜져 있으면 다음 영상으로 유지 진행
     currentIndex++;
     loadVideo(currentIndex, true);
-    setTimeout(() => video.play(), 500);
+    schedulePlaylistItemPlayback(playlist[currentIndex], 500);
   }
 };
 
@@ -8617,7 +8683,7 @@ function _applySettingsSnapshot(s) {
   if (typeof s.ttsKoUseSubtitle === 'boolean') ttsKoUseSubtitle = s.ttsKoUseSubtitle;
   if (Number.isFinite(s.mainVolume) && s.mainVolume >= 0 && s.mainVolume <= VP_VOLUME_MAX) mainVolume = s.mainVolume;
   if (typeof s.muted === 'boolean') video.muted = s.muted;
-  if (typeof s.skipGaps === 'boolean') skipGaps = s.skipGaps;
+  if (typeof s.skipGaps === 'boolean') { if (skipGaps !== s.skipGaps) _skipSubtitlelessChain = null; skipGaps = s.skipGaps; }
   if (typeof s.sequentialSlowdownEnabled === 'boolean') sequentialSlowdownEnabled = s.sequentialSlowdownEnabled;
   if (Number.isFinite(s.targetRepeatCount) && s.targetRepeatCount > 0) targetRepeatCount = s.targetRepeatCount;
   if (Number.isFinite(s.minPlaybackSpeed) && s.minPlaybackSpeed > 0) minPlaybackSpeed = s.minPlaybackSpeed;
@@ -11434,6 +11500,7 @@ document.addEventListener('keydown', (e) => {
   else if(matchSC('skip-gap', e)) {
     e.preventDefault();
     skipGaps = !skipGaps;
+    _skipSubtitlelessChain = null;
     showTimeDisplay(skipGaps ? '⏭ 일반구간 스킵 ON' : '▶ 일반구간 스킵 OFF');
     updateLoopStatus();
     // 스킵 ON 시점에서 자막 밖이면 바로 다음 자막 / 다음 파일로 점프 (loopMode 무관)
@@ -12130,6 +12197,7 @@ function updateShiftHoverPanelUI() {
 }
 function shiftHoverToggleSkipGaps() {
   skipGaps = !skipGaps;
+  _skipSubtitlelessChain = null;
   updateLoopStatus();
   updateBottomFloatUI();
   if (skipGaps) triggerSkipGap(true);
