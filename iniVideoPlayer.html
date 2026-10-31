@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C514';
+document.documentElement.dataset.vpBuild = 'C515';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -7954,7 +7954,8 @@ video.onended=()=>{
     setTimeout(() => video.play(), 500);
   } else {
     // playlistLoopMode === 'none' 이어도 loopMode가 켜져 있으면 다음 영상으로 유지 진행
-    if(loopMode !== 'none' && currentIndex < playlist.length - 1){
+    // 일반 구간 스킵 ON이면 자막이 있는 영상의 끝에서도 다음 항목으로 넘긴다.
+    if ((loopMode !== 'none' || (skipGaps && subtitles.length > 0)) && currentIndex < playlist.length - 1) {
       currentIndex++;
       loadVideo(currentIndex, true);
       setTimeout(() => video.play(), 500);
