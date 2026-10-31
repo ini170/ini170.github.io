@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C519';
+document.documentElement.dataset.vpBuild = 'C520';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -812,10 +812,10 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .overlay-inline-controls .overlay-inline-align { display:inline-flex; align-items:center; flex-wrap:wrap; gap:2px; min-width:0; border-left:1px solid rgba(145,145,152,.38); padding-left:4px; }
 @media (max-width:480px) { .overlay-inline-controls { gap:3px; padding:3px; } .overlay-inline-controls button { min-width:24px; min-height:24px; padding:2px 3px; } }
 /* C497: align the container fullscreen control with the browser's bottom controls without replacing native playback/seek/volume buttons. */
-#videoContainerFullscreenButton { position:absolute; z-index:1300; top:auto; right:4px; bottom:40px; display:flex; opacity:.58; transition:opacity .15s; width:36px; min-width:36px; height:36px; min-height:36px; padding:0; align-items:center; justify-content:center; border:1px solid rgba(190,190,198,.32); border-radius:4px; background:rgba(18,18,20,.62); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+#videoContainerFullscreenButton { position:absolute; z-index:1300; top:auto; right:4px; bottom:4px; display:flex; opacity:.58; transition:opacity .15s; width:36px; min-width:36px; height:36px; min-height:36px; padding:0; align-items:center; justify-content:center; border:1px solid rgba(190,190,198,.32); border-radius:4px; background:rgba(18,18,20,.62); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
 #videoContainerFullscreenButton:hover,#videoContainerFullscreenButton:focus-visible { border-color:rgba(220,220,225,.55); background:rgba(68,68,74,.72); }
 #video::-webkit-media-controls-fullscreen-button { display:none !important; }
-@media (max-width:480px) { #videoContainerFullscreenButton { top:auto; right:52px; bottom:34px; width:32px; min-width:32px; height:32px; min-height:32px; } }
+@media (max-width:480px) { #videoContainerFullscreenButton { top:auto; right:52px; bottom:4px; width:32px; min-width:32px; height:32px; min-height:32px; } }
 #videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { opacity:1; }
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls-enclosure,
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls-panel,
