@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C523';
+document.documentElement.dataset.vpBuild = 'C524';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -12415,6 +12415,8 @@ let overlayInteractionPointer = null;
 let overlayInteractionToolbarKey = '';
 let overlayInteractionPinnedKey = '';
 let overlayInteractionPinnedPointer = null;
+let overlayInteractionHoverKey = '';
+let overlayInteractionHoverClearTimer = 0;
 const overlayCtrlTargetClass = 'ctrl-overlay-target';
 
 function overlayLayerConfigs() {
@@ -12645,6 +12647,11 @@ function updateOverlayCtrlTarget(x,y) {
   const container=document.getElementById('videoContainer');
   const hasPointer=!!(overlayInteractionPointer&&container);
   const ctrlMode=overlayInteractionCtrlHeld&&!playerControlsShiftHeld&&hasPointer&&!audioOnlyMode;
+  if(!ctrlMode){
+    overlayInteractionHoverKey='';
+    if(overlayInteractionHoverClearTimer)clearTimeout(overlayInteractionHoverClearTimer);
+    overlayInteractionHoverClearTimer=0;
+  }
   const layers=overlayLayerConfigs();
   for(const layer of layers)if(layer.enabled)clampOverlayPositionForKey(layer.key,false);
   for(const layer of layers){
@@ -12662,8 +12669,10 @@ function updateOverlayCtrlTarget(x,y) {
     if(overlayInteractionPinnedKey)target=overlayControlTargetForKey(overlayInteractionPinnedKey);
     else if(overlayInteractionToolbarKey)target=overlayControlTargetForKey(overlayInteractionToolbarKey);
     else if(hasPointer)target=findOverlayTextTargetAt(overlayInteractionPointer.x,overlayInteractionPointer.y);
+    if(!target&&overlayInteractionHoverKey)target=overlayControlTargetForKey(overlayInteractionHoverKey);
   }
   if(target?.element){
+    overlayInteractionHoverKey=target.key;
     target.element.classList.add(overlayCtrlTargetClass);
     overlayInlineControlsForKey(target.key)?.classList.add(overlayCtrlTargetClass);
     clampOverlayPositionForKey(target.key,false);
@@ -12780,12 +12789,30 @@ function installPlayerModifierInteraction() {
     if(event.shiftKey&&!playerControlsShiftHeld){overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;setPlayerControlsShiftHeld(true);}
     if(event.shiftKey||playerControlsShiftHeld)openShiftHoverControlPanel(event.target);
     if(shiftHoverControlPanelOpen){
-      overlayInteractionToolbarKey='';overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;overlayInteractionPointer=null;modifierPointerPending=null;
+      overlayInteractionToolbarKey='';overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;overlayInteractionHoverKey='';overlayInteractionPointer=null;modifierPointerPending=null;
+      if(overlayInteractionHoverClearTimer)clearTimeout(overlayInteractionHoverClearTimer);
+      overlayInteractionHoverClearTimer=0;
       if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
       modifierPointerFrame=0;updateOverlayCtrlTarget();return;
     }
     const overlayControl=event.target instanceof Element?event.target.closest('.overlay-inline-controls'):null;
+    const textHover=overlayControl?null:findOverlayTextTargetAt(event.clientX,event.clientY);
+    const directHoverKey=overlayControl?.dataset.overlayOptionKey||textHover?.key||'';
     overlayInteractionToolbarKey=overlayControl?.dataset.overlayOptionKey||'';
+    overlayInteractionPointer={x:event.clientX,y:event.clientY};
+    if(directHoverKey){
+      overlayInteractionHoverKey=directHoverKey;
+      if(overlayInteractionHoverClearTimer)clearTimeout(overlayInteractionHoverClearTimer);
+      overlayInteractionHoverClearTimer=0;
+    }else if(overlayInteractionHoverKey&&overlayInteractionCtrlHeld&&!playerControlsShiftHeld&&!ctrlOverlayGesture){
+      if(overlayInteractionHoverClearTimer)clearTimeout(overlayInteractionHoverClearTimer);
+      overlayInteractionHoverClearTimer=setTimeout(()=>{
+        overlayInteractionHoverClearTimer=0;
+        if(overlayInteractionToolbarKey||overlayInteractionPinnedKey||ctrlOverlayGesture)return;
+        overlayInteractionHoverKey='';
+        updateOverlayCtrlTarget(overlayInteractionPointer?.x,overlayInteractionPointer?.y);
+      },650);
+    }
     modifierPointerPending={x:event.clientX,y:event.clientY};
     if(overlayInteractionToolbarKey){
       if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
@@ -12803,7 +12830,9 @@ function installPlayerModifierInteraction() {
   container.addEventListener('pointerleave',()=>{
     if(shiftHoverControlPanelOpen)closeShiftHoverControlPanel(false);
     if(ctrlOverlayGesture)return;
-    overlayInteractionPointer=null;overlayInteractionToolbarKey='';overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;modifierPointerPending=null;
+    overlayInteractionPointer=null;overlayInteractionToolbarKey='';overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;overlayInteractionHoverKey='';modifierPointerPending=null;
+    if(overlayInteractionHoverClearTimer)clearTimeout(overlayInteractionHoverClearTimer);
+    overlayInteractionHoverClearTimer=0;
     if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
     modifierPointerFrame=0;updateOverlayCtrlTarget();
   });
