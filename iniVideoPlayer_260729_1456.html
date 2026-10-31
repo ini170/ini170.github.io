@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C518';
+document.documentElement.dataset.vpBuild = 'C519';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1973,7 +1973,7 @@ const SC_DEFAULTS = {
   // 플레이리스트
   'pl-up':          { code:'ArrowUp',      shift:false,ctrl:false, label:'항목 위로 (목록 포커스)', group:'📋 목록' },
   'pl-down':        { code:'ArrowDown',    shift:false,ctrl:false, label:'항목 아래로 (목록 포커스)', group:'📋 목록' },
-  'pl-play':        { code:'Enter',        shift:false,ctrl:false, label:'선택 재생',         group:'📋 목록' },
+  'pl-play':        { code:'Enter',        shift:true, ctrl:false, label:'선택 재생',         group:'📋 목록' },
   'pl-open-location':{ code:'Enter',       shift:false,ctrl:true,  label:'연결 위치 열기',     group:'📋 목록' },
   'pl-copy-parent': { code:'KeyC',         shift:false,ctrl:true, alt:false,label:'상위 경로 복사', group:'📋 목록' },
   'pl-prev':        { code:'PageUp',       shift:false,ctrl:false, label:'이전 파일',         group:'📋 목록' },
@@ -2077,6 +2077,17 @@ function _playerKeyboardEntryTarget(target) {
   const el = target && target.nodeType === 1 ? target : target?.parentElement;
   return !!el?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],.drag-num-editor');
 }
+window.addEventListener('keydown', e => {
+  if (_scRebinding || e.isComposing || e.repeat || e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  if (_playerKeyboardEntryTarget(e.target) || _playerKeyboardEntryTarget(document.activeElement)) return;
+  const targetElement = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
+  const activeElement = document.activeElement;
+  if (targetElement?.closest?.('button,a,[role="button"],summary') || activeElement?.closest?.('button,a,[role="button"],summary')) return;
+  if (matchSC('pl-play', e)) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  void toggleVideoContainerFullscreen(e);
+}, true);
 // Space 는 브라우저 미디어 컨트롤보다 먼저 받아 페이지 스크롤/네이티브 토글과 중복되지 않게 한다.
 window.addEventListener('keydown', e => {
   if (_scRebinding || e.isComposing || !matchSC('play-pause', e) ||
