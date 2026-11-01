@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C524';
+document.documentElement.dataset.vpBuild = 'C525';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -811,12 +811,17 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .overlay-inline-controls .overlay-inline-toggle { min-width:42px; }
 .overlay-inline-controls .overlay-inline-align { display:inline-flex; align-items:center; flex-wrap:wrap; gap:2px; min-width:0; border-left:1px solid rgba(145,145,152,.38); padding-left:4px; }
 @media (max-width:480px) { .overlay-inline-controls { gap:3px; padding:3px; } .overlay-inline-controls button { min-width:24px; min-height:24px; padding:2px 3px; } }
-/* C497: align the container fullscreen control with the browser's bottom controls without replacing native playback/seek/volume buttons. */
-#videoContainerFullscreenButton { position:absolute; z-index:1300; top:auto; right:4px; bottom:4px; display:flex; opacity:.58; transition:opacity .15s; width:36px; min-width:36px; height:36px; min-height:36px; padding:0; align-items:center; justify-content:center; border:1px solid rgba(190,190,198,.32); border-radius:4px; background:rgba(18,18,20,.62); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
-#videoContainerFullscreenButton:hover,#videoContainerFullscreenButton:focus-visible { border-color:rgba(220,220,225,.55); background:rgba(68,68,74,.72); }
+/* Keep volume and fullscreen in one custom control capsule beside the native More control. */
+#videoAudioFullscreenGroup { position:absolute; z-index:1300; right:52px; bottom:4px; display:flex; align-items:center; gap:5px; height:36px; max-width:calc(100% - 96px); padding:3px 6px; box-sizing:border-box; border:1px solid rgba(190,190,198,.32); border-radius:19px; background:rgba(18,18,20,.88); opacity:.76; transition:opacity .15s; color:#eee; }
+#videoAudioFullscreenGroup button { display:flex; flex:0 0 30px; width:30px; min-width:30px; height:30px; min-height:30px; padding:0; align-items:center; justify-content:center; border:0; border-radius:50%; background:transparent; color:#eee; font:700 16px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; }
+#videoAudioFullscreenGroup button:hover,#videoAudioFullscreenGroup button:focus-visible { background:rgba(100,100,108,.55); outline:none; }
+#videoContainerVolumeSlider { width:clamp(52px,7vw,86px); min-width:52px; height:20px; margin:0; accent-color:#ddd; cursor:pointer; }
+#videoContainerVolumeValue { min-width:32px; color:#ddd; font:600 10px/1 system-ui,sans-serif; text-align:center; }
+#video::-webkit-media-controls-mute-button,#video::-webkit-media-controls-volume-slider,#video::-webkit-media-controls-volume-control-container { display:none !important; }
+#videoContainerFullscreenButton { flex-basis:30px; }
 #video::-webkit-media-controls-fullscreen-button { display:none !important; }
-@media (max-width:480px) { #videoContainerFullscreenButton { top:auto; right:52px; bottom:4px; width:32px; min-width:32px; height:32px; min-height:32px; } }
-#videoContainer:hover #videoContainerFullscreenButton,#videoContainer:focus-within #videoContainerFullscreenButton,#videoContainer.overlay-modifier-active #videoContainerFullscreenButton { opacity:1; }
+@media (max-width:480px) { #videoAudioFullscreenGroup { right:48px; height:32px; gap:2px; padding:2px 4px; } #videoAudioFullscreenGroup button { flex-basis:27px; width:27px; min-width:27px; height:27px; min-height:27px; } #videoContainerVolumeSlider { width:52px; min-width:52px; } #videoContainerVolumeValue { display:none; } }
+#videoContainer:hover #videoAudioFullscreenGroup,#videoContainer:focus-within #videoAudioFullscreenGroup,#videoContainer.overlay-modifier-active #videoAudioFullscreenGroup { opacity:1; }
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls-enclosure,
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls-panel,
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls { display:none !important; }
@@ -1174,7 +1179,12 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
       <div id="dropOverlay" style="position:absolute;inset:0;z-index:10;pointer-events:none;"></div>
       <!-- Ctrl 호버 중 꺼진 문자열도 조작 구역으로 표시합니다. -->
       <div id="subtitleVideoOverlay" aria-hidden="true"></div>
-      <button id="videoContainerFullscreenButton" type="button" aria-label="플레이어 전체화면" title="플레이어 전체화면" onclick="toggleVideoContainerFullscreen(event)">⛶</button>
+      <div id="videoAudioFullscreenGroup" role="group" aria-label="음량 및 전체화면">
+        <button id="videoContainerMuteButton" type="button" aria-label="음소거" title="음소거" onclick="toggleMute()">🔊</button>
+        <input id="videoContainerVolumeSlider" type="range" min="0" max="150" step="5" value="30" aria-label="플레이어 음량 0에서 150퍼센트">
+        <span id="videoContainerVolumeValue" aria-live="off">30%</span>
+        <button id="videoContainerFullscreenButton" type="button" aria-label="플레이어 전체화면" title="플레이어 전체화면" onclick="toggleVideoContainerFullscreen(event)">⛶</button>
+      </div>
       <!-- 번역 영상 위 오버레이 -->
 
       <div id="transVideoOverlay">
@@ -1929,6 +1939,10 @@ function adjustMainVolume(delta) {
 }
 
 document.getElementById('mainVolumeSlider')?.addEventListener('input', event => {
+  mainVolume = Math.max(0, Math.min(VP_VOLUME_MAX, Number(event.target.value) / 100));
+  applyMainVolume(); scheduleMainVolumeSave(); updateBottomFloatUI(); updateShiftHoverPanelUI();
+});
+document.getElementById('videoContainerVolumeSlider')?.addEventListener('input', event => {
   mainVolume = Math.max(0, Math.min(VP_VOLUME_MAX, Number(event.target.value) / 100));
   applyMainVolume(); scheduleMainVolumeSave(); updateBottomFloatUI(); updateShiftHoverPanelUI();
 });
@@ -11988,6 +12002,12 @@ function _updateMuteBtn() {
   const lb = document.getElementById('btn-mute-label');
   if (ic) ic.textContent = video.muted ? '🔇' : '🔊';
   if (lb) lb.textContent = video.muted ? '음소거' : '소리';
+  const overlayMute = document.getElementById('videoContainerMuteButton');
+  if (overlayMute) {
+    overlayMute.textContent = video.muted ? '🔇' : '🔊';
+    overlayMute.title = video.muted ? '음소거 해제' : '음소거';
+    overlayMute.setAttribute('aria-label', overlayMute.title);
+  }
 }
 video.addEventListener('play',  _updatePlayPauseBtn);
 video.addEventListener('pause', _updatePlayPauseBtn);
@@ -11995,6 +12015,8 @@ video.addEventListener('volumechange', () => {
   _updateMuteBtn();
   applyTtsOutputVolume();
 });
+_updateMuteBtn();
+syncContainerFullscreenButton();
 
 // ===== 사이드 패널 토글 =====
 // HTML 초기 상태: #rightPanel.class="hidden", #sidePanelToggle.class="closed" 이므로 닫힌 상태에서 시작
@@ -12337,6 +12359,9 @@ function updateBottomFloatUI() {
   txt('bf-vol',      Math.round(mainVolume * 100) + '%');
   const volumeSlider = document.getElementById('mainVolumeSlider');
   if (volumeSlider && document.activeElement !== volumeSlider) volumeSlider.value = String(Math.round(mainVolume * 100));
+  const videoVolumeSlider = document.getElementById('videoContainerVolumeSlider');
+  if (videoVolumeSlider && document.activeElement !== videoVolumeSlider) videoVolumeSlider.value = String(Math.round(mainVolume * 100));
+  txt('videoContainerVolumeValue', Math.round(mainVolume * 100) + '%');
   txt('bf-repeat-val', '반복 ' + repeatTimes);
   txt('bf-speed',    'x' + baseSpeed.toFixed(1));
   txt('bf-minspeed', '최저' + minPlaybackSpeed.toFixed(2));
@@ -12740,7 +12765,7 @@ function installPlayerModifierInteraction() {
     const inlineToolbar=event.target instanceof Element?event.target.closest('.overlay-inline-controls'):null;
     const controlButton=inlineToolbar&&event.target instanceof Element?event.target.closest('button'):null;
     const fromToolbar=!!inlineToolbar;
-    if(event.button!==0||event.pointerType==='touch'||(!fromToolbar&&isInlineControl(event.target))||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
+    if(event.button!==0||event.pointerType==='touch'||(!fromToolbar&&isInlineControl(event.target))||event.target?.closest?.('#videoAudioFullscreenGroup,#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
     if(!(event.ctrlKey||overlayInteractionCtrlHeld)||(event.shiftKey||playerControlsShiftHeld)||audioOnlyMode)return;
     overlayInteractionCtrlHeld=true;
     updateOverlayCtrlTarget(event.clientX,event.clientY);
@@ -12775,7 +12800,7 @@ function installPlayerModifierInteraction() {
   window.addEventListener('blur',()=>finishCtrlOverlayGesture(null,false));
   document.addEventListener('visibilitychange',()=>{if(document.hidden)finishCtrlOverlayGesture(null,false);});
   container.addEventListener('click',event=>{
-    if(isInlineControl(event.target)||event.target?.closest?.('#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
+    if(isInlineControl(event.target)||event.target?.closest?.('#videoAudioFullscreenGroup,#videoContainerFullscreenButton,#bottomFloatPanel,#shiftHoverPanel'))return;
     if(event.ctrlKey||overlayInteractionCtrlHeld){event.preventDefault();event.stopImmediatePropagation();}
   },true);
 
@@ -12786,6 +12811,15 @@ function installPlayerModifierInteraction() {
       if(Math.hypot(dx,dy)>=4){overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;}
     }
     if(event.pointerType==='touch')return;
+    if(event.target instanceof Element&&event.target.closest('#videoAudioFullscreenGroup')){
+      overlayInteractionToolbarKey='';overlayInteractionHoverKey='';modifierPointerPending=null;
+      if(overlayInteractionHoverClearTimer)clearTimeout(overlayInteractionHoverClearTimer);
+      overlayInteractionHoverClearTimer=0;
+      if(modifierPointerFrame)cancelAnimationFrame(modifierPointerFrame);
+      modifierPointerFrame=0;
+      updateOverlayCtrlTarget(event.clientX,event.clientY);
+      return;
+    }
     if(event.shiftKey&&!playerControlsShiftHeld){overlayInteractionPinnedKey='';overlayInteractionPinnedPointer=null;setPlayerControlsShiftHeld(true);}
     if(event.shiftKey||playerControlsShiftHeld)openShiftHoverControlPanel(event.target);
     if(shiftHoverControlPanelOpen){
@@ -12853,7 +12887,7 @@ function installPlayerModifierInteraction() {
   container.addEventListener('wheel',event=>{
     if(!event.deltaY||audioOnlyMode)return;
     const eventElement=event.target instanceof Element?event.target:null;
-    if(eventElement?.closest('#bottomFloatPanel,#shiftHoverPanel'))return;
+    if(eventElement?.closest('#videoAudioFullscreenGroup,#bottomFloatPanel,#shiftHoverPanel'))return;
     const inlineControl=eventElement?.closest('.overlay-inline-controls');
     if(event.ctrlKey&&event.shiftKey){
       const key=inlineControl?.dataset.overlayOptionKey||findOverlayTextTargetAt(event.clientX,event.clientY)?.key;
