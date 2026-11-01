@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C533';
+document.documentElement.dataset.vpBuild = 'C534';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -811,18 +811,19 @@ html.vp-hosted #playlistPermissionGate { display:none !important; }
 .overlay-inline-controls .overlay-inline-toggle { min-width:42px; }
 .overlay-inline-controls .overlay-inline-align { display:inline-flex; align-items:center; flex-wrap:wrap; gap:2px; min-width:0; border-left:1px solid rgba(145,145,152,.38); padding-left:4px; }
 @media (max-width:480px) { .overlay-inline-controls { gap:3px; padding:3px; } .overlay-inline-controls button { min-width:24px; min-height:24px; padding:2px 3px; } }
-/* Reserve a right-side slot so the visible control order is sound, More, fullscreen. */
-#video::-webkit-media-controls-panel { padding-right:48px !important; }
-#videoContainerFullscreenButton { position:absolute; z-index:1300; right:4px; bottom:38px; display:flex; align-items:center; justify-content:center; width:40px; min-width:40px; height:40px; min-height:40px; padding:0; border:0; border-radius:4px; background:transparent; color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .16s,background-color .12s,visibility .16s; }
+#videoContainerFullscreenButton { position:absolute; z-index:1300; right:4px; bottom:27px; display:flex; align-items:center; justify-content:center; width:40px; min-width:40px; height:40px; min-height:40px; padding:0; border:0; border-radius:50%; background:rgba(31,31,36,.76); color:#eee; font:700 18px/1 system-ui,sans-serif; cursor:pointer; touch-action:manipulation; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .16s,background-color .12s,visibility .16s; }
 
 #videoContainerFullscreenButton:hover,#videoContainerFullscreenButton:focus-visible { background:rgba(110,110,118,.48); outline:none; }
 #videoContainer.vp-native-controls-visible #videoContainerFullscreenButton { opacity:.92; visibility:visible; pointer-events:auto; }
-#videoContainer.vp-native-controls-quiet #videoContainerFullscreenButton { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+#videoContainer.vp-native-controls-quiet #videoContainerFullscreenButton,#videoContainer.vp-native-controls-idle #videoContainerFullscreenButton { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
 #video::-webkit-media-controls-fullscreen-button { display:none !important; }
-@media (max-width:480px) { #video::-webkit-media-controls-panel { padding-right:40px !important; } #videoContainerFullscreenButton { right:4px; width:32px; min-width:32px; height:32px; min-height:32px; } }
+@media (max-width:480px) { #videoContainerFullscreenButton { right:4px; bottom:31px; width:32px; min-width:32px; height:32px; min-height:32px; } }
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls-enclosure,
+#videoContainer.vp-native-controls-idle video::-webkit-media-controls-enclosure,
 #videoContainer.vp-native-controls-quiet video::-webkit-media-controls-panel,
-#videoContainer.vp-native-controls-quiet video::-webkit-media-controls { display:none !important; }
+#videoContainer.vp-native-controls-idle video::-webkit-media-controls-panel,
+#videoContainer.vp-native-controls-quiet video::-webkit-media-controls,
+#videoContainer.vp-native-controls-idle video::-webkit-media-controls { display:none !important; }
 #videoContainer:fullscreen,#videoContainer:-webkit-full-screen { width:100vw !important; height:100vh !important; max-width:100vw !important; max-height:100vh !important; flex:none !important; border:0 !important; border-radius:0 !important; background:#000 !important; }
 #videoContainer:fullscreen > video,#videoContainer:-webkit-full-screen > video { width:100% !important; height:100% !important; object-fit:contain; }
 #videoContainer.shift-hover-panel-open { touch-action:pan-y; }
@@ -1799,31 +1800,32 @@ async function toggleVideoContainerFullscreen(event) {
 document.addEventListener('fullscreenchange', syncContainerFullscreenButton);
 document.addEventListener('webkitfullscreenchange', syncContainerFullscreenButton);
 let nativeFullscreenButtonHideTimer = 0;
+function hideNativeControlGroup() {
+  const container = document.getElementById('videoContainer');
+  clearTimeout(nativeFullscreenButtonHideTimer);
+  nativeFullscreenButtonHideTimer = 0;
+  if (!container) return;
+  container.classList.remove('vp-native-controls-visible');
+  container.classList.add('vp-native-controls-idle');
+}
 function showNativeFullscreenButton() {
   const container = document.getElementById('videoContainer');
   if (!container) return;
   clearTimeout(nativeFullscreenButtonHideTimer);
-  container.classList.add('vp-native-controls-visible');
-  if (video.paused) return;
-  nativeFullscreenButtonHideTimer = window.setTimeout(() => {
-    nativeFullscreenButtonHideTimer = 0;
-    if (!video.paused) container.classList.remove('vp-native-controls-visible');
-  }, 2200);
-}
-function keepNativeFullscreenButtonForPause() {
-  const container = document.getElementById('videoContainer');
-  clearTimeout(nativeFullscreenButtonHideTimer);
   nativeFullscreenButtonHideTimer = 0;
-  if (container) container.classList.add('vp-native-controls-visible');
+  if (!video.currentSrc && !video.src) { hideNativeControlGroup(); return; }
+  container.classList.remove('vp-native-controls-idle');
+  container.classList.add('vp-native-controls-visible');
+  nativeFullscreenButtonHideTimer = window.setTimeout(hideNativeControlGroup, 2200);
 }
 const fullscreenControlContainer = document.getElementById('videoContainer');
 fullscreenControlContainer?.addEventListener('pointermove', showNativeFullscreenButton, { passive:true });
 fullscreenControlContainer?.addEventListener('pointerenter', showNativeFullscreenButton, { passive:true });
-fullscreenControlContainer?.addEventListener('pointerleave', showNativeFullscreenButton, { passive:true });
 fullscreenControlContainer?.addEventListener('keydown', showNativeFullscreenButton);
 video.addEventListener('play', showNativeFullscreenButton);
-video.addEventListener('pause', keepNativeFullscreenButtonForPause);
-keepNativeFullscreenButtonForPause();
+video.addEventListener('pause', showNativeFullscreenButton);
+video.addEventListener('emptied', hideNativeControlGroup);
+hideNativeControlGroup();
 let activePlaylistVideoUrl = null;
 function _releasePlaylistVideoUrl() {
   const url = activePlaylistVideoUrl;
