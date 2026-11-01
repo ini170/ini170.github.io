@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C529';
+document.documentElement.dataset.vpBuild = 'C530';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -11784,8 +11784,10 @@ document.addEventListener('wheel', (e) => {
     e.preventDefault();
     const step = 0.05;
     const volumeDelta = e.deltaY < 0 ? step : -step;
-    if (volumeDelta > 0 && video.muted) toggleMute();
+    const audioUnlockPending = volumeDelta > 0 && video.muted && _vpResumeAudioPending;
+    if (volumeDelta > 0 && video.muted && !_vpResumeAudioPending) toggleMute();
     adjustMainVolume(volumeDelta);
+    if (audioUnlockPending) showTimeDisplay('🔇 자동 재생 음소거 대기 중 · 음량만 변경', 2500);
     return;
   }
 
