@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C525';
+document.documentElement.dataset.vpBuild = 'C526';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -11765,12 +11765,14 @@ document.addEventListener('wheel', (e) => {
   const rp = document.getElementById('rightPanel');
   if (rp && rp.contains(e.target)) { e.preventDefault(); return; }
 
-  // leftPanel 안에서만 볼륨 조절
+  // leftPanel 안에서만 호버 휠 볼륨 조절. 위로 올릴 때만 이 입력 경로에서 음소거를 해제한다.
   const lp = document.getElementById('leftPanel');
   if (lp && lp.contains(e.target)) {
     e.preventDefault();
     const step = 0.05;
-    adjustMainVolume(e.deltaY < 0 ? step : -step);
+    const volumeDelta = e.deltaY < 0 ? step : -step;
+    if (volumeDelta > 0 && video.muted) toggleMute();
+    adjustMainVolume(volumeDelta);
     return;
   }
 
