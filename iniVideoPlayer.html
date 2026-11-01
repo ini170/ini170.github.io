@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C534';
+document.documentElement.dataset.vpBuild = 'C535';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -1952,16 +1952,21 @@ function applyMainVolume() {
 }
 
 function adjustMainVolume(delta) {
+  const previousVolume = mainVolume;
   mainVolume = Math.round(Math.max(0, Math.min(VP_VOLUME_MAX, mainVolume + delta)) * 100) / 100;
   applyMainVolume();
+  if (mainVolume > previousVolume) _vpUnmuteOnVolumeIncrease();
   scheduleMainVolumeSave();
   updateBottomFloatUI(); updateShiftHoverPanelUI();
   showTimeDisplay(`${delta < 0 ? '🔉' : '🔊'} ${Math.round(mainVolume * 100)}%`);
 }
 
 document.getElementById('mainVolumeSlider')?.addEventListener('input', event => {
+  const previousVolume = mainVolume;
   mainVolume = Math.max(0, Math.min(VP_VOLUME_MAX, Number(event.target.value) / 100));
-  applyMainVolume(); scheduleMainVolumeSave(); updateBottomFloatUI(); updateShiftHoverPanelUI();
+  applyMainVolume();
+  if (mainVolume > previousVolume) _vpUnmuteOnVolumeIncrease();
+  scheduleMainVolumeSave(); updateBottomFloatUI(); updateShiftHoverPanelUI();
 });
 
 // ===================================================================
@@ -3613,13 +3618,10 @@ function _vpRestoreResumeAudioOnGesture() {
   // If muted autoplay was blocked, this same user gesture is allowed to start it.
   try { if (video.paused && !video.ended) video.play().catch(() => {}); } catch (e) {}
 }
-// After refresh, restore audio on an upward volume-wheel gesture without touching play/pause.
-function _vpUnmuteResumeAudioFromVolumeWheel() {
-  if (!_vpResumeAudioPending || !video.muted) return false;
-  try { if (typeof applyMainVolume === 'function') applyMainVolume(); } catch (e) {}
-  try { video.muted = false; } catch (e) { return false; }
-  try { saveSettings(); } catch (e) {}
-  return true;
+// Increasing the actual player volume unmutes audio without changing playback state.
+function _vpUnmuteOnVolumeIncrease() {
+  if (!video.muted) return false;
+  try { video.muted = false; return true; } catch (e) { return false; }
 }
 // Window capture runs before document handlers that may stop propagation.
 for (const type of _vpResumeAudioGestureEvents)
@@ -11790,14 +11792,13 @@ document.addEventListener('wheel', (e) => {
   const rp = document.getElementById('rightPanel');
   if (rp && rp.contains(e.target)) { e.preventDefault(); return; }
 
-  // leftPanel 안에서만 호버 휠로 음량을 조절한다. 휠은 음소거/재생 상태를 건드리지 않는다.
+  // 왼쪽 패널 호버 휠은 음량을 조절하며, 실제 음량 증가 시 음소거만 해제한다.
   const lp = document.getElementById('leftPanel');
   if (lp && lp.contains(e.target)) {
     e.preventDefault();
     const step = 0.05;
     const volumeDelta = e.deltaY < 0 ? step : -step;
     adjustMainVolume(volumeDelta);
-    if (volumeDelta > 0) _vpUnmuteResumeAudioFromVolumeWheel();
     if (volumeDelta > 0 && video.muted) showTimeDisplay('🔇 음소거 상태 · 휠은 음량만 조절', 2000);
     return;
   }
@@ -13181,9 +13182,11 @@ function installVideoTouchGestures() {
         : Math.min(gesture.baseVolume, Math.max(0, rawVolume));
       const nextVolume = Math.round(boundedVolume * 100) / 100;
       if (nextVolume !== mainVolume) {
+        const previousVolume = mainVolume;
         mainVolume = nextVolume;
         gesture.volumeChanged = true;
         applyMainVolume();
+        if (mainVolume > previousVolume) _vpUnmuteOnVolumeIncrease();
       }
     }
   }, { passive: false });
