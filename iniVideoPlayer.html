@@ -4,7 +4,7 @@
 
 <title>iniVideoPlayer</title>
 <script>
-document.documentElement.dataset.vpBuild = 'C531';
+document.documentElement.dataset.vpBuild = 'C532';
 const vpEmbeddedEarly = new URLSearchParams(location.search).get('embedded') === '1';
 if (vpEmbeddedEarly) {
   // 스타일을 읽기 전에 임베드 상태를 확정한다. 저장 목록 복원·부모 handshake보다
@@ -3608,6 +3608,14 @@ function _vpRestoreResumeAudioOnGesture() {
   try { video.muted = false; } catch (e) {}
   // If muted autoplay was blocked, this same user gesture is allowed to start it.
   try { if (video.paused && !video.ended) video.play().catch(() => {}); } catch (e) {}
+}
+// After refresh, restore audio on an upward volume-wheel gesture without touching play/pause.
+function _vpUnmuteResumeAudioFromVolumeWheel() {
+  if (!_vpResumeAudioPending || !video.muted) return false;
+  try { if (typeof applyMainVolume === 'function') applyMainVolume(); } catch (e) {}
+  try { video.muted = false; } catch (e) { return false; }
+  try { saveSettings(); } catch (e) {}
+  return true;
 }
 // Window capture runs before document handlers that may stop propagation.
 for (const type of _vpResumeAudioGestureEvents)
@@ -11785,6 +11793,7 @@ document.addEventListener('wheel', (e) => {
     const step = 0.05;
     const volumeDelta = e.deltaY < 0 ? step : -step;
     adjustMainVolume(volumeDelta);
+    if (volumeDelta > 0) _vpUnmuteResumeAudioFromVolumeWheel();
     if (volumeDelta > 0 && video.muted) showTimeDisplay('🔇 음소거 상태 · 휠은 음량만 조절', 2000);
     return;
   }
